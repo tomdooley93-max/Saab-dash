@@ -401,16 +401,19 @@ button:disabled { opacity: .35; }
 <div class="err" id="err" hidden></div>
 <script>
 /* Shows script errors on screen: there is no developer console on the phone. */
-function reportError(e) {
+function showScriptError(e) {
   var box = document.getElementById('err'), msg = (e && (e.message || e.reason && e.reason.message || e.reason)) || String(e);
   if (e && e.lineno) msg += ' (rad ' + e.lineno + ')';
   box.textContent = 'Fel: ' + msg + '  ·  tryck för att stänga'; box.hidden = false;
   box.onclick = function () { box.hidden = true; };
 }
-window.addEventListener('error', reportError);
-window.addEventListener('unhandledrejection', reportError);
+window.addEventListener('error', showScriptError);
+window.addEventListener('unhandledrejection', showScriptError);
 </script>
 <script>
+/* Everything lives in this function scope: Bluefy injects its own scripts into the page,
+   and a top-level name clashing with one of theirs stops the whole app from running. */
+(function () {
 'use strict';
 const BUILD = 'BUILD_STAMP';
 document.getElementById('chipTxt').textContent = 'Skript steg 1';
@@ -886,6 +889,8 @@ log('Version ' + BUILD + ' · ' + navigator.userAgent);
 let startSlide = 0; try { startSlide = +localStorage.getItem('saab.slide') || 0; setNight(!!localStorage.getItem('saab.night')); } catch (e) {}
 renderDtc();
 startDemo();
-requestAnimationFrame(() => { render(); try { goSlide(Math.min(startSlide, pages.length - 1)); } catch (e) { reportError(e); } });
+requestAnimationFrame(() => { render(); try { goSlide(Math.min(startSlide, pages.length - 1)); } catch (e) { showScriptError(e); } });
 if (!navigator.bluetooth) log('Obs: Web Bluetooth saknas i den här webbläsaren. På iPhone: öppna sidan i appen Bluefy.');
+window.saabDash = { goSlide, setNight, showAlert, build: BUILD }; // for testing from the console
+})();
 </script>
