@@ -292,7 +292,7 @@ button:disabled { opacity: .35; }
       <div class="tile" data-k="boost"><div class="tile-head"><span class="label">Laddtryck</span></div><div class="num"><span data-v>--</span><span class="u">bar</span></div><div class="scale h" data-scale="boost"></div></div>
       <div class="tile" data-k="rpm"><div class="tile-head"><span class="label">Varvtal</span><span class="label">rpm</span></div><div class="num" data-v>--</div><div class="scale h" data-scale="rpm"></div></div>
       <div class="tile" data-k="coolant"><div class="tile-head"><span class="label">Kylvatten</span></div><div class="num"><span data-v>--</span><span class="u">°C</span></div><div class="scale h" data-scale="coolant"></div></div>
-      <div class="tile" data-k="batt"><div class="tile-head"><span class="label">Batteri</span><span class="label">V</span></div><div class="num" data-v>--</div><div class="scale h" data-scale="batt"></div></div>
+      <div class="tile" data-k="batt"><div class="tile-head"><span class="label">Batteri</span></div><div class="num"><span data-v>--</span><span class="u">V</span></div><div class="scale h" data-scale="batt"></div></div>
     </section>
 
     <!-- LADDTRYCK -->
@@ -339,8 +339,8 @@ button:disabled { opacity: .35; }
     <!-- BATTERI -->
     <section class="page p-gauge has-dial" data-name="Batteri">
       <svg class="ldial" data-dial="volt"></svg>
-      <div class="head"><span class="label">Batteri · V</span><span class="label" id="vState">--</span></div>
-      <div class="hero"><div class="num" id="vVal">--</div></div>
+      <div class="head"><span class="label">Batteri</span><span class="label" id="vState">--</span></div>
+      <div class="hero"><div class="num"><span id="vVal">--</span><span class="u">V</span></div></div>
       <div class="scale h" data-scale="battBig"></div>
       <div class="stats side"><div class="stat"><span class="label">Min</span><b id="vMin">--</b></div><div class="stat"><span class="label">Max</span><b id="vMax">--</b></div></div>
     </section>
@@ -590,8 +590,8 @@ function buildDials() {
   s = q('volt'); s.setAttribute('viewBox', '0 0 440 330');
   dials.volt = makeDial(s, { cx: 220, cy: 182, r: 132, lo: 8, hi: 16, minor: 0.5, major: 2, w: 12,
     zones: [[8, 11.8, 'var(--red)'], [13.2, 14.8, 'var(--green-dim)'], [15.2, 16, 'var(--amber)']] });
-  dials.volt.val = dials.volt.txt(176, 104, 'var(--green)', 'big');
-  dials.volt.unit = dials.volt.txt(238, 16, 'var(--dim)'); dials.volt.unit.textContent = 'BATTERI V';
+  dials.volt.val = withUnit(dials.volt.txt(176, 92, 'var(--green)', 'big'), 'V');
+  dials.volt.txt(238, 16, 'var(--dim)').textContent = 'BATTERI';
   dials.volt.sub = dials.volt.txt(312, 16, 'var(--dim)', 'sub');
   // FART: classic twin cluster, tach left, speedo right
   s = q('speed'); s.setAttribute('viewBox', '0 0 860 340');
