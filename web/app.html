@@ -275,7 +275,7 @@ button:disabled { opacity: .35; }
 
 <div class="app" id="app">
   <div class="strip top">
-    <span class="label chip" id="chip" data-s="demo"><i></i><span id="chipTxt">Demo</span></span>
+    <span class="label chip" id="chip" data-s="wait"><i></i><span id="chipTxt">Skript startar inte</span></span>
     <span class="grow"></span>
     <span class="label page-name" id="pageName">Översikt</span>
     <span class="grow"></span>
@@ -412,6 +412,8 @@ window.addEventListener('unhandledrejection', reportError);
 </script>
 <script>
 'use strict';
+const BUILD = 'BUILD_STAMP';
+document.getElementById('chipTxt').textContent = 'Skript steg 1';
 /* ================= BLE protocol v1 (see PROTOCOL.md) ================= */
 const UUID = s => `7a5a${s}-5341-4142-9b3e-0c2a1d4e8f01`;
 const SVC = UUID('0001'), CH_DATA = UUID('0002'), CH_DTC = UUID('0003'), CH_CMD = UUID('0004'), CH_LOG = UUID('0005');
@@ -879,6 +881,8 @@ setInterval(() => {
 }, 1000);
 
 /* ================= Boot ================= */
+setStatus('wait', 'Skript steg 2');
+log('Version ' + BUILD + ' · ' + navigator.userAgent);
 let startSlide = 0; try { startSlide = +localStorage.getItem('saab.slide') || 0; setNight(!!localStorage.getItem('saab.night')); } catch (e) {}
 renderDtc();
 startDemo();
