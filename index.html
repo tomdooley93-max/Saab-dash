@@ -268,6 +268,11 @@ button:disabled { opacity: .35; }
 }
 .cmd { display: flex; gap: 8px; }
 .cmd input { flex: 1; min-width: 0; font: 14px ui-monospace, Menlo, monospace; color: #fff; background: #000; border: 1px solid var(--line); border-radius: 4px; padding: 8px 10px; }
+.err {
+  position: fixed; left: 8px; right: 8px; top: calc(8px + env(safe-area-inset-top, 0px)); z-index: 9;
+  background: #2a0000; color: #ffb4b4; border: 1px solid var(--red); border-radius: 4px; padding: 10px;
+  font: 13px/1.4 ui-monospace, Menlo, monospace; overflow-wrap: anywhere;
+}
 @media (prefers-reduced-motion: reduce) { .app { transition: none; } }
 </style>
 
@@ -400,6 +405,18 @@ button:disabled { opacity: .35; }
   </form>
 </div>
 
+<div class="err" id="err" hidden></div>
+<script>
+/* Shows script errors on screen: there is no developer console on the phone. */
+function reportError(e) {
+  var box = document.getElementById('err'), msg = (e && (e.message || e.reason && e.reason.message || e.reason)) || String(e);
+  if (e && e.lineno) msg += ' (rad ' + e.lineno + ')';
+  box.textContent = 'Fel: ' + msg + '  ·  tryck för att stänga'; box.hidden = false;
+  box.onclick = function () { box.hidden = true; };
+}
+window.addEventListener('error', reportError);
+window.addEventListener('unhandledrejection', reportError);
+</script>
 <script>
 'use strict';
 /* ================= BLE protocol v1 (see PROTOCOL.md) ================= */
@@ -720,7 +737,11 @@ function onSlideChange() {
   try { localStorage.setItem('saab.slide', i); } catch (e) {}
 }
 slidesEl.addEventListener('scroll', () => { clearTimeout(slidesEl._t); slidesEl._t = setTimeout(onSlideChange, 80); });
-function goSlide(i, smooth) { slidesEl.scrollTo({ left: i * slidesEl.clientWidth, behavior: smooth ? 'smooth' : 'instant' }); if (!smooth) onSlideChange(); }
+function goSlide(i, smooth) {
+  // 'instant' is not a valid scroll behavior in older WebKit (throws), so jump via scrollLeft
+  if (smooth) slidesEl.scrollTo({ left: i * slidesEl.clientWidth, behavior: 'smooth' });
+  else { slidesEl.scrollLeft = i * slidesEl.clientWidth; onSlideChange(); }
+}
 // tap empty page area = next page (like the touch display); buttons keep their own action
 let downX = 0;
 slidesEl.addEventListener('pointerdown', e => { downX = e.clientX; });
@@ -728,7 +749,7 @@ slidesEl.addEventListener('click', e => {
   if (Math.abs(e.clientX - downX) > 8 || e.target.closest('button, .dtc-list')) return;
   goSlide((state.slide + 1) % pages.length, true);
 });
-window.addEventListener('resize', () => slidesEl.scrollTo({ left: state.slide * slidesEl.clientWidth }));
+window.addEventListener('resize', () => { slidesEl.scrollLeft = state.slide * slidesEl.clientWidth; });
 
 /* ================= Bluetooth ================= */
 const ble = { dev: null, cmd: null, want: false, tries: 0 };
@@ -837,7 +858,7 @@ const btnNight = $('btnNight'), speedSvg = document.querySelector('[data-dial="s
 function setNight(on) {
   document.body.classList.toggle('night', on); btnNight.setAttribute('aria-pressed', String(on));
   speedSvg.setAttribute('viewBox', on ? '450 0 410 340' : '0 0 860 340'); // night: speedometer only
-  requestAnimationFrame(() => slidesEl.scrollTo({ left: state.slide * slidesEl.clientWidth }));
+  requestAnimationFrame(() => { slidesEl.scrollLeft = state.slide * slidesEl.clientWidth; });
   try { localStorage.setItem('saab.night', on ? '1' : ''); } catch (e) {}
 }
 btnNight.onclick = () => setNight(true);
@@ -868,7 +889,7 @@ setInterval(() => {
 let startSlide = 0; try { startSlide = +localStorage.getItem('saab.slide') || 0; setNight(!!localStorage.getItem('saab.night')); } catch (e) {}
 renderDtc();
 startDemo();
-requestAnimationFrame(() => { goSlide(Math.min(startSlide, pages.length - 1)); render(); });
+requestAnimationFrame(() => { render(); try { goSlide(Math.min(startSlide, pages.length - 1)); } catch (e) { reportError(e); } });
 if (!navigator.bluetooth) log('Obs: Web Bluetooth saknas i den här webbläsaren. På iPhone: öppna sidan i appen Bluefy.');
 </script>
 
