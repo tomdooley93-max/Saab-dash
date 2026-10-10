@@ -2,7 +2,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#000000">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@300;500&family=Barlow+Semi+Condensed:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@300;500&family=Barlow+Semi+Condensed:wght@400;500;600&family=Saira+Semi+Condensed:wght@400;500&display=swap">
 <style>
 /* Layout: full-bleed instrument pages swiped sideways. Each page is a size container; numbers scale with
    min(cqw,cqh) so the same page works upright and sideways in a phone holder. Saab night-panel palette:
@@ -22,6 +22,7 @@
   --dim: #7d857f;
   --tick: #3c443e;
   --num: "Barlow Condensed", "Arial Narrow", "Helvetica Neue", system-ui, sans-serif;
+  --scale-font: "Saira Semi Condensed", "Barlow Semi Condensed", "Arial Narrow", sans-serif;
   --font: "Barlow Semi Condensed", "Arial Narrow", "Helvetica Neue", system-ui, sans-serif;
   color-scheme: dark;
 }
@@ -234,6 +235,7 @@ button:disabled { opacity: .35; }
 }
 .ldial { display: none; overflow: visible; }
 .ldial text { font-family: var(--font); font-variant-numeric: tabular-nums; }
+.ldial text.sc { font-family: var(--scale-font); font-weight: 500; }
 .ldial .big { font-family: var(--num); font-weight: 500; }
 /* portrait-only extras hidden in landscape and vice versa */
 @media (orientation: portrait) { .side.l-only { display: none; } }
@@ -536,13 +538,15 @@ function makeDial(svg, o) {
   sv('path', { d: arcPath(cx, cy, r, A, A + S), stroke: 'var(--rail)', 'stroke-width': o.w || 10, fill: 'none', 'stroke-linecap': 'butt' }, g);
   for (const [z0, z1, c] of o.zones || []) sv('path', { d: arcPath(cx, cy, r + (o.w || 10) / 2 + 5, ang(z0), ang(z1)), stroke: c, 'stroke-width': 3, fill: 'none' }, g);
   for (let v = lo; v <= hi + 1e-9; v += o.minor) {
-    const major = Math.abs((v - lo) / o.major - Math.round((v - lo) / o.major)) < 1e-6;
-    const a = ang(v), r0 = r - (o.w || 10) / 2 - 6, r1 = r0 - (major ? 16 : 8);
+    const on = step => step && Math.abs((v - lo) / step - Math.round((v - lo) / step)) < 1e-6;
+    const major = on(o.major), mid = !major && on(o.mid);
+    const a = ang(v), r0 = r - (o.w || 10) / 2 - 6, r1 = r0 - (major ? 17 : mid ? 11 : 6);
     const [x0, y0] = P(cx, cy, r0, a), [x1, y1] = P(cx, cy, r1, a);
-    sv('line', { x1: x0, y1: y0, x2: x1, y2: y1, stroke: major ? 'var(--cap)' : 'var(--tick)', 'stroke-width': major ? 2.5 : 1.5, class: major ? '' : 'minor' }, g);
+    sv('line', { x1: x0, y1: y0, x2: x1, y2: y1, stroke: major ? 'var(--cap)' : mid ? 'var(--dim)' : 'var(--tick)',
+      'stroke-width': major ? 2.6 : mid ? 1.8 : 1.2, class: major ? '' : 'minor' }, g);
     if (major) {
-      const [lx, ly] = P(cx, cy, mode === 'arc' ? r + (o.w || 10) / 2 + 24 : r1 - 18, a);
-      const t = sv('text', { x: lx, y: ly, 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-size': o.lsize || 17, fill: 'var(--dim)' }, g);
+      const [lx, ly] = P(cx, cy, mode === 'arc' ? r + (o.w || 10) / 2 + 24 : r1 - (o.lsize || 17) * 0.95, a);
+      const t = sv('text', { x: lx, y: ly, 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-size': o.lsize || 17, fill: o.lcolor || 'var(--dim)', class: 'sc' }, g);
       t.textContent = o.label ? o.label(v) : +v.toFixed(2);
     }
   }
@@ -566,9 +570,15 @@ function makeDial(svg, o) {
 const dials = {};
 /* Splits a big dial value into number + small unit; returns the number part to update. */
 function withUnit(text, unit) {
-  const n = sv('tspan', {}, text);
-  const u = sv('tspan', { 'font-size': '0.3em', fill: 'var(--dim)', dx: 6 }, text); u.textContent = unit;
-  return n;
+  const size = +text.getAttribute('font-size'), x = +text.getAttribute('x'), y = +text.getAttribute('y');
+  const u = sv('text', { y: y + size * 0.34, 'font-size': Math.round(size * 0.3), fill: 'var(--dim)' }, text.parentNode);
+  u.textContent = unit; text._unit = u; text._cx = x; text._w = -1;
+  return text;
+}
+// keeps the unit right after the (centred) number; only re-measures when the width changes
+function placeUnit(text) {
+  const w = text.getComputedTextLength();
+  if (Math.abs(w - text._w) > 0.5) { text._w = w; text._unit.setAttribute('x', (text._cx + w / 2 + 6).toFixed(1)); }
 }
 function buildDials() {
   const q = k => document.querySelector(`[data-dial="${k}"]`);
@@ -595,13 +605,12 @@ function buildDials() {
   dials.volt.sub = dials.volt.txt(312, 16, 'var(--dim)', 'sub');
   // FART: classic twin cluster, tach left, speedo right
   s = q('speed'); s.setAttribute('viewBox', '0 0 860 340');
-  dials.rpm = makeDial(s, { cx: 205, cy: 180, r: 160, lo: 0, hi: 8, minor: 0.25, major: 1, mode: 'needle', w: 6, lsize: 22, zones: [[6, 8, 'var(--red)']] });
+  dials.rpm = makeDial(s, { cx: 205, cy: 180, r: 160, lo: 0, hi: 8, minor: 0.1, mid: 0.5, major: 1, lcolor: 'var(--cap)', mode: 'needle', w: 6, lsize: 22, zones: [[6, 8, 'var(--red)']] });
   dials.rpm.val = dials.rpm.txt(262, 44, 'var(--cap)', 'big');
   dials.rpm.txt(300, 14, 'var(--dim)').textContent = 'VARV/MIN';
   dials.rpm.txt(120, 14, 'var(--dim)').textContent = '×1000';
   dials.rpm.g.classList.add('tach');
-  dials.kmh = makeDial(s, { cx: 655, cy: 180, r: 160, lo: 0, hi: 240, minor: 10, major: 20, mode: 'needle', w: 6, lsize: 18,
-    label: v => v % 40 === 0 ? v : '' });
+  dials.kmh = makeDial(s, { cx: 655, cy: 180, r: 160, lo: 0, hi: 260, minor: 5, mid: 10, major: 20, mode: 'needle', w: 6, lsize: 19, lcolor: 'var(--cap)' });
   dials.kmh.val = dials.kmh.txt(256, 68, 'var(--green)', 'big');
   dials.kmh.txt(300, 14, 'var(--dim)').textContent = 'KM/H';
 }
@@ -669,13 +678,13 @@ function render() {
 
   // landscape dials
   if (matchMedia('(orientation: landscape)').matches) {
-    dials.boost.set(live ? disp.boost : null, col(live && bC(d.boost))); set(dials.boost.val, L(d.boost, 2));
+    dials.boost.set(live ? disp.boost : null, col(live && bC(d.boost))); set(dials.boost.val, L(d.boost, 2)); placeUnit(dials.boost.val);
     dials.boost.val.setAttribute('fill', col(live && bC(d.boost)));
     set(dials.boost.sub, `MAX ${fmt(sess.bMax, 2)}   ·   IAT ${L(d.iat, 0)}°   ·   AFR ${L(d.afr, 1)}`);
-    dials.temp.set(live ? d.coolant : null, col(live && tC(d.coolant))); set(dials.temp.val, L(d.coolant, 0));
+    dials.temp.set(live ? d.coolant : null, col(live && tC(d.coolant))); set(dials.temp.val, L(d.coolant, 0)); placeUnit(dials.temp.val);
     dials.temp.val.setAttribute('fill', col(live && tC(d.coolant)));
     set(dials.temp.sub, $('tState').textContent.toUpperCase());
-    dials.volt.set(live ? d.batt : null, col(live && vC(d.batt))); set(dials.volt.val, L(d.batt, 1));
+    dials.volt.set(live ? d.batt : null, col(live && vC(d.batt))); set(dials.volt.val, L(d.batt, 1)); placeUnit(dials.volt.val);
     dials.volt.val.setAttribute('fill', col(live && vC(d.batt)));
     set(dials.volt.sub, $('vState').textContent.toUpperCase());
     dials.rpm.set(live ? disp.rpm / 1000 : null); set(dials.rpm.val, L(d.rpm, 0));
