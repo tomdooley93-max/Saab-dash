@@ -12,7 +12,7 @@ Bil ─CAN (P-bus 500k)─ ESP32-dongel (WiCAN-OBD) ─BLE─ iPhone (Bluefy)
 | `PROTOCOL.md` | BLE-protokollet mellan dongel och app (GATT-UUID:er, paketformat, kommandon) |
 | `web/app.html` | Appens källa |
 | `web/build.sh` | Bygger `docs/index.html` från källan |
-| `docs/index.html` | Fristående sida som GitHub Pages publicerar |
+| `index.html`, `docs/index.html` | Fristående sida som GitHub Pages publicerar (byggs, ändra inte för hand) |
 | `firmware/` | (kommer) ESP32-firmware för dongeln |
 
 ## Använda appen

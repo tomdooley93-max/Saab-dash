@@ -1,0 +1,876 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+</head>
+<body>
+<title>Saab Gauge</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#000000">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@300;500&family=Barlow+Semi+Condensed:wght@400;500;600&display=swap">
+<style>
+/* Layout: full-bleed instrument pages swiped sideways. Each page is a size container; numbers scale with
+   min(cqw,cqh) so the same page works upright and sideways in a phone holder. Saab night-panel palette:
+   green on black, amber/red only for state, cyan for vacuum. */
+:root {
+  --bg: #000000;
+  --panel: #0a0b0a;
+  --line: #1f2420;
+  --rail: #161a17;
+  --green: #00ff41;
+  --green-dim: #0a6b25;
+  --amber: #ff7a00;
+  --red: #ff2a2a;
+  --cel: #ffcc00;
+  --vac: #19c3ff;
+  --cap: #c8c8c8;
+  --dim: #7d857f;
+  --tick: #3c443e;
+  --num: "Barlow Condensed", "Arial Narrow", "Helvetica Neue", system-ui, sans-serif;
+  --font: "Barlow Semi Condensed", "Arial Narrow", "Helvetica Neue", system-ui, sans-serif;
+  color-scheme: dark;
+}
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body {
+  background: var(--bg); color: var(--cap); font-family: var(--font); margin: 0; overflow: hidden;
+  -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+}
+.app { height: 100%; display: flex; flex-direction: column; transition: filter .3s; }
+.night-exit { display: none; }
+
+/* ---------- Night Panel ----------
+   Saab principle: only what matters stays lit, everything else goes dark.
+   Normal colours are dimmed through the tokens; amber/red keep full strength,
+   so a warning is the brightest thing on the screen at night. */
+body.night {
+  --green: #0a8a2d; --green-dim: #053a14; --cap: #6a6d6b; --dim: #3f4641; --tick: #222724;
+  --rail: #0b0e0c; --line: #101311; --vac: #0d6c8c; --cel: #ffcc00;
+}
+body.night .strip { display: none; }
+body.night .night-exit {
+  display: block; position: fixed; z-index: 3; right: 12px; bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  color: var(--dim); border-color: var(--line); padding: 6px 10px; font-size: 11px;
+}
+/* per page: keep the value (and its bar/dial), drop the rest */
+body.night .tile .scale,
+body.night .p-boost .hero .stats, body.night .p-boost .side, body.night .p-boost .reset,
+body.night .p-speed .foot,
+body.night .p-gauge .stats, body.night .p-gauge .scale .lb,
+body.night .p-air .air-bar, body.night .p-air .stats, body.night #fDev,
+body.night .scale .tk:not(.big), body.night .scale .lb { display: none !important; }
+body.night .p-speed .seg-wrap:not(.hot) { visibility: hidden; }
+body.night .dtc-actions { display: none; }
+body.night .air-col { grid-template-rows: auto auto; align-content: center; }
+body.night .air-col.req .num, body.night .air-col.req .label { color: #8a4400; } /* identity colour, not a warning */
+body.night .ldial .minor, body.night .ldial .sub, body.night .ldial .tach { display: none; }
+
+
+/* ---------- chrome: one slim strip on top, one at the bottom ---------- */
+.strip {
+  display: flex; align-items: center; gap: 8px; padding: 6px 16px; min-height: 36px; box-sizing: border-box;
+  border-color: var(--line); border-style: solid; border-width: 0;
+}
+.strip.top { border-bottom-width: 1px; }
+.strip.bottom { border-top-width: 1px; }
+.grow { flex: 1; }
+.label { font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: var(--dim); white-space: nowrap; }
+.chip { display: inline-flex; align-items: center; gap: 6px; }
+.chip i { width: 7px; height: 7px; border-radius: 50%; background: var(--tick); }
+.chip[data-s="on"] { color: var(--green); } .chip[data-s="on"] i { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.chip[data-s="wait"] { color: var(--amber); } .chip[data-s="wait"] i { background: var(--amber); }
+.chip[data-s="demo"] { color: var(--vac); } .chip[data-s="demo"] i { background: var(--vac); }
+.page-name { color: var(--green); }
+button {
+  font: 500 13px var(--font); letter-spacing: .1em; text-transform: uppercase; color: var(--cap);
+  background: transparent; border: 1px solid var(--line); border-radius: 4px; padding: 7px 11px; cursor: pointer;
+}
+button:active { background: var(--rail); }
+button:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+button.go { color: var(--green); border-color: var(--green-dim); }
+button.danger { color: var(--red); border-color: #4d1515; }
+button[aria-pressed="true"] { color: var(--green); border-color: var(--green-dim); }
+button:disabled { opacity: .35; }
+.dots { display: flex; gap: 6px; }
+.dots i { width: 18px; height: 3px; background: var(--tick); border-radius: 2px; transition: background .2s; }
+.dots i.on { background: var(--green); }
+
+/* ---------- pages ---------- */
+.slides { flex: 1; min-height: 0; display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; }
+.slides::-webkit-scrollbar { display: none; }
+.page {
+  flex: 0 0 100%; height: 100%; scroll-snap-align: center; container-type: size; position: relative;
+  box-sizing: border-box; padding: 16px; display: grid; gap: 14px; overflow: hidden;
+}
+.num { font-family: var(--num); font-weight: 500; line-height: .86; color: var(--green); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+.unit { font-size: 15px; letter-spacing: .12em; color: var(--dim); text-transform: uppercase; }
+.nodata {
+  position: absolute; left: 16px; right: 16px; top: 12px; z-index: 1; text-align: center;
+  font-size: 13px; letter-spacing: .16em; color: var(--amber); padding: 6px; border: 1px solid #4a2600; border-radius: 4px; background: #0d0700;
+}
+.cel { position: absolute; right: 16px; bottom: 14px; width: 34px; fill: var(--cel); }
+.vac { color: var(--vac) !important; } .warn { color: var(--amber) !important; } .crit { color: var(--red) !important; }
+
+/* stat row: small label / value pairs */
+.stats { display: flex; gap: 22px; flex-wrap: wrap; align-items: flex-end; }
+.stat { display: grid; gap: 4px; }
+.stat b { font: 500 clamp(22px, 7cqmin, 40px)/1 var(--num); color: var(--cap); font-variant-numeric: tabular-nums; }
+
+/* linear scale (horizontal default, .v = vertical) */
+.scale { position: relative; }
+.scale .rail { position: absolute; background: var(--rail); border-radius: 2px; overflow: hidden; }
+.scale .zone { position: absolute; opacity: .9; }
+.scale .fill { position: absolute; background: var(--green); transition: none; }
+.scale .mark { position: absolute; background: var(--cap); }
+.scale .peak { position: absolute; background: var(--amber); }
+.scale .tk { position: absolute; background: var(--tick); }
+.scale .tk.big { background: var(--dim); }
+.scale .lb { position: absolute; font: 500 13px var(--font); color: var(--dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.scale.h { height: 46px; }
+.scale.h .rail { left: 0; right: 0; top: 0; height: 12px; }
+.scale.h .zone { top: 13px; height: 3px; }
+.scale.h .fill { left: 0; top: 0; bottom: 0; }
+.scale.h .mark { top: -6px; width: 3px; height: 24px; margin-left: -1.5px; }
+.scale.h .peak { top: -4px; width: 2px; height: 20px; margin-left: -1px; }
+.scale.h .tk { top: 18px; width: 1px; height: 6px; } .scale.h .tk.big { height: 10px; width: 2px; }
+.scale.h .lb { top: 30px; transform: translateX(-50%); }
+.scale.h .lb.first { transform: none; } .scale.h .lb.last { transform: translateX(-100%); }
+.scale.v { width: 64px; }
+.scale.v .rail { top: 0; bottom: 0; left: 0; width: 16px; }
+.scale.v .zone { left: 17px; width: 3px; }
+.scale.v .fill { left: 0; right: 0; bottom: 0; }
+.scale.v .mark { left: -8px; height: 4px; width: 32px; margin-bottom: -2px; }
+.scale.v .peak { left: -5px; height: 2px; width: 26px; margin-bottom: -1px; }
+.scale.v .tk { left: 22px; height: 1px; width: 7px; } .scale.v .tk.big { width: 12px; height: 2px; }
+.scale.v .lb { left: 38px; transform: translateY(50%); }
+
+/* ÖVERSIKT: 2×2 tiles split by hairlines */
+.p-main { grid-template: 1.5fr 1fr / repeat(3, minmax(0, 1fr)); gap: 0; padding: 0; }
+.tile { display: grid; grid-template-rows: auto 1fr auto; padding: 16px; gap: 6px; min-width: 0; min-height: 0; container-type: size; border-color: var(--line); border-style: solid; border-width: 0; }
+.p-main .tile[data-k="boost"] { grid-column: 1 / 4; border-bottom-width: 1px; }
+.p-main .tile[data-k="rpm"], .p-main .tile[data-k="coolant"] { border-right-width: 1px; }
+.tile .num { font-size: min(34cqw, 40cqh); align-self: center; }
+.p-main .tile[data-k="boost"] .num { font-size: min(40cqw, 56cqh); }
+.tile .scale.h { height: 14px; } .tile .scale .lb, .tile .scale .tk { display: none; }
+.tile-head { display: flex; justify-content: space-between; }
+
+/* LADDTRYCK: hero number + tall tape */
+.p-boost { grid-template: 1fr auto / 1fr auto; }
+.p-boost .hero { display: grid; align-content: center; gap: 10px; min-width: 0; }
+.p-boost .hero .num { font-size: min(44cqw, 38cqh); }
+.p-boost .scale.v { grid-row: 1 / 3; grid-column: 2; margin: 6px 0 10px; }
+
+/* FART: shift-light rpm strip + huge speed */
+.p-speed { grid-template-rows: auto 1fr auto; }
+.seg { display: flex; gap: 3px; height: min(9cqh, 54px); }
+.seg i { flex: 1; background: var(--rail); border-radius: 2px; }
+.seg i.on { background: var(--green); } .seg i.on.a { background: var(--amber); } .seg i.on.r { background: var(--red); }
+.seg-scale { display: flex; justify-content: space-between; margin-top: 6px; font-size: 13px; color: var(--dim); font-variant-numeric: tabular-nums; }
+.p-speed .hero { display: grid; place-content: center; text-align: center; gap: 8px; }
+.p-speed .hero .num { font-size: min(52cqw, 40cqh); }
+.p-speed .foot { display: flex; justify-content: space-between; align-items: flex-end; }
+
+/* KYLVATTEN / BATTERI */
+.p-gauge { grid-template-rows: auto 1fr auto auto; }
+.p-gauge .hero { display: grid; align-content: center; gap: 10px; }
+.p-gauge .hero .num { font-size: min(50cqw, 34cqh); }
+
+/* LUFTMASSA: two columns with comparable bars */
+.p-air { grid-template-rows: auto 1fr auto; }
+.air-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; min-height: 0; }
+.air-col { display: grid; grid-template-rows: auto auto 1fr; gap: 8px; min-width: 0; }
+.air-col .num { font-size: min(24cqw, 17cqh); }
+.air-bar { position: relative; background: var(--rail); border-radius: 2px; min-height: 40px; overflow: hidden; }
+.air-bar i { position: absolute; left: 0; right: 0; bottom: 0; height: var(--p, 0%); }
+.air-col.req .num, .air-col.req .label { color: var(--amber); } .air-col.req .air-bar i { background: var(--amber); }
+.air-col.act .num, .air-col.act .label { color: var(--green); } .air-col.act .air-bar i { background: var(--green); }
+.badge { font-size: 12px; letter-spacing: .14em; color: var(--amber); border: 1px solid #4a2600; padding: 3px 7px; border-radius: 3px; }
+
+/* FELKODER */
+.p-dtc { grid-template-rows: auto 1fr auto; }
+.dtc-list { display: flex; flex-direction: column; overflow: auto; min-height: 0; border-top: 1px solid var(--line); }
+.dtc-row { display: flex; align-items: baseline; gap: 14px; padding: 14px 2px; border-bottom: 1px solid var(--line); }
+.dtc-row .num { font-size: 40px; color: var(--cap); }
+.dtc-empty { margin: auto; text-align: center; display: grid; gap: 10px; color: var(--green); letter-spacing: .14em; }
+.dtc-empty svg { width: 64px; margin: 0 auto; fill: var(--green-dim); }
+.dtc-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.p-boost .reset { grid-column: 1; }
+
+/* ---------- landscape (phone sideways in the holder): its own layout ----------
+   One merged chrome row, the main value takes the left ~70 % at full height,
+   secondary values move to a narrow ruled column on the right. */
+@media (orientation: landscape) {
+  .app { display: grid; grid-template: auto 1fr / 1fr auto; }
+  .strip.top { grid-area: 1 / 1; }
+  .strip.bottom { grid-area: 1 / 2; border-top-width: 0; border-bottom-width: 1px; padding-left: 0; }
+  .slides { grid-area: 2 / 1 / 3 / 3; }
+  .page { padding: 14px 20px; }
+  .side {
+    display: flex; flex-direction: column; justify-content: center; gap: 4cqh;
+    border-left: 1px solid var(--line); padding-left: 24px; min-width: 22cqw;
+  }
+  .side .stat b { font-size: min(11cqh, 52px); }
+
+  /* ÖVERSIKT: boost is the hero, the other three stack on the right */
+  .p-main { grid-template: 1fr 1fr 1fr / 1.6fr 1fr; padding: 0; }
+  .p-main .tile { border-width: 0 !important; }
+  .p-main .tile[data-k="boost"] { grid-area: 1 / 1 / 4 / 2; border-right-width: 1px !important; padding: 18px 24px; }
+  .p-main .tile[data-k="boost"] .num { font-size: min(44cqw, 62cqh); }
+  .p-main .tile[data-k="boost"] .scale.h { height: 20px; }
+  .p-main .tile:not([data-k="boost"]) { grid-column: 2; grid-template: auto 1fr / 1fr; padding: 10px 20px; }
+  .p-main .tile[data-k="rpm"], .p-main .tile[data-k="coolant"] { border-bottom-width: 1px !important; }
+  .p-main .tile:not([data-k="boost"]) .num { font-size: min(34cqw, 66cqh); }
+  .p-main .tile:not([data-k="boost"]) .scale { display: none; }
+
+  /* Dial pages: only the instrument, nothing else */
+  .page.has-dial { display: block; padding: 10px 16px 6px; }
+  .page.has-dial > :not(.ldial):not(.nodata):not(.cel) { display: none !important; }
+  .ldial { display: block !important; width: 100%; height: 100%; }
+
+  /* LUFTMASSA: two big numbers, slim horizontal bars */
+  .air-col { grid-template-rows: auto 1fr auto; }
+  .air-col .num { font-size: min(22cqw, 46cqh); align-self: center; }
+  .air-bar { min-height: 0; height: 10px; }
+  .air-bar i { top: 0; bottom: 0; right: auto; height: auto !important; width: var(--p, 0%); }
+}
+.ldial { display: none; overflow: visible; }
+.ldial text { font-family: var(--font); font-variant-numeric: tabular-nums; }
+.ldial .big { font-family: var(--num); font-weight: 500; }
+/* portrait-only extras hidden in landscape and vice versa */
+@media (orientation: portrait) { .side.l-only { display: none; } }
+
+/* DTC alert: takes the whole screen */
+.alert {
+  position: fixed; inset: 0; z-index: 4; background: var(--bg); display: grid; place-content: center;
+  justify-items: center; gap: 18px; cursor: pointer; padding: 16px;
+}
+.alert .t { color: var(--red); font-size: 22px; letter-spacing: .3em; font-weight: 600; }
+.alert svg { width: min(46vw, 240px); fill: var(--cel); }
+.alert .c { font: 500 min(26vw, 140px)/1 var(--num); color: #fff; }
+.alert .h { color: var(--dim); font-size: 13px; letter-spacing: .14em; text-transform: uppercase; }
+
+/* log sheet */
+.sheet {
+  position: fixed; left: 0; right: 0; bottom: 0; max-height: 75%; display: flex; flex-direction: column; z-index: 5;
+  background: #070807; border-top: 1px solid var(--line); box-sizing: border-box; gap: 10px;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+}
+.sheet .stats b { font-size: 20px; }
+.hex { font: 12px ui-monospace, Menlo, monospace; color: var(--cap); overflow-wrap: anywhere; }
+.log {
+  flex: 1; min-height: 120px; overflow: auto; margin: 0; padding: 8px; background: #000; border: 1px solid var(--line);
+  border-radius: 4px; font: 12px/1.45 ui-monospace, Menlo, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere;
+  -webkit-user-select: text; user-select: text;
+}
+.cmd { display: flex; gap: 8px; }
+.cmd input { flex: 1; min-width: 0; font: 14px ui-monospace, Menlo, monospace; color: #fff; background: #000; border: 1px solid var(--line); border-radius: 4px; padding: 8px 10px; }
+@media (prefers-reduced-motion: reduce) { .app { transition: none; } }
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-cel" viewBox="0 0 64 44"><path d="M14 8h14V4h-8V0h22v4h-8v4h10l6 6h6v-4h6v24h-6v-4h-6l-6 8H18l-4-6H8v6H2V14h6v6h6z"/></symbol>
+</svg>
+
+<div class="app" id="app">
+  <div class="strip top">
+    <span class="label chip" id="chip" data-s="demo"><i></i><span id="chipTxt">Demo</span></span>
+    <span class="grow"></span>
+    <span class="label page-name" id="pageName">Översikt</span>
+    <span class="grow"></span>
+    <button id="btnDemo" aria-pressed="true">Demo</button>
+    <button id="btnConn" class="go">Anslut</button>
+  </div>
+
+  <div class="slides" id="slides">
+
+    <!-- ÖVERSIKT -->
+    <section class="page p-main" data-name="Översikt">
+      <div class="tile" data-k="boost"><div class="tile-head"><span class="label">Laddtryck</span><span class="label">bar</span></div><div class="num" data-v>--</div><div class="scale h" data-scale="boost"></div></div>
+      <div class="tile" data-k="rpm"><div class="tile-head"><span class="label">Varvtal</span><span class="label">rpm</span></div><div class="num" data-v>--</div><div class="scale h" data-scale="rpm"></div></div>
+      <div class="tile" data-k="coolant"><div class="tile-head"><span class="label">Kylvatten</span><span class="label">°C</span></div><div class="num" data-v>--</div><div class="scale h" data-scale="coolant"></div></div>
+      <div class="tile" data-k="batt"><div class="tile-head"><span class="label">Batteri</span><span class="label">V</span></div><div class="num" data-v>--</div><div class="scale h" data-scale="batt"></div></div>
+    </section>
+
+    <!-- LADDTRYCK -->
+    <section class="page p-boost has-dial" data-name="Laddtryck">
+      <svg class="ldial" data-dial="boost"></svg>
+      <div class="hero">
+        <span class="label">Laddtryck · bar</span>
+        <div class="num" id="bVal">--</div>
+        <div class="stats">
+          <div class="stat"><span class="label">Max</span><b id="bMax">--</b></div>
+          <div class="stat"><span class="label">IAT °C</span><b id="bIat">--</b></div>
+          <div class="stat"><span class="label">AFR</span><b id="bAfr">--</b></div>
+        </div>
+      </div>
+      <div class="side l-only">
+        <div class="stat"><span class="label">Max</span><b data-dup="bMax">--</b></div>
+        <div class="stat"><span class="label">IAT °C</span><b data-dup="bIat">--</b></div>
+        <div class="stat"><span class="label">AFR</span><b data-dup="bAfr">--</b></div>
+      </div>
+      <div class="scale v" data-scale="boostTape"></div>
+      <div class="reset"><button id="bReset">Nollställ max</button></div>
+    </section>
+
+    <!-- FART -->
+    <section class="page p-speed has-dial" data-name="Fart">
+      <svg class="ldial" data-dial="speed"></svg>
+      <div class="seg-wrap"><div class="seg" id="seg"></div><div class="seg-scale"><span>0</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span></div></div>
+      <div class="hero"><div class="num" id="sVal">--</div><span class="unit">km/h</span></div>
+      <div class="foot side">
+        <div class="stat"><span class="label">Varvtal</span><b id="sRpm">--</b></div>
+        <div class="stat"><span class="label">Laddtryck</span><b id="sBoost">--</b></div>
+      </div>
+    </section>
+
+    <!-- KYLVATTEN -->
+    <section class="page p-gauge has-dial" data-name="Kylvatten">
+      <svg class="ldial" data-dial="temp"></svg>
+      <div class="head"><span class="label">Kylvatten · °C</span><span class="label" id="tState">--</span></div>
+      <div class="hero"><div class="num" id="tVal">--</div></div>
+      <div class="scale h" data-scale="coolantBig"></div>
+      <div class="stats side"><div class="stat"><span class="label">Min</span><b id="tMin">--</b></div><div class="stat"><span class="label">Max</span><b id="tMax">--</b></div><div class="stat"><span class="label">Insug °C</span><b id="tIat">--</b></div></div>
+    </section>
+
+    <!-- BATTERI -->
+    <section class="page p-gauge has-dial" data-name="Batteri">
+      <svg class="ldial" data-dial="volt"></svg>
+      <div class="head"><span class="label">Batteri · V</span><span class="label" id="vState">--</span></div>
+      <div class="hero"><div class="num" id="vVal">--</div></div>
+      <div class="scale h" data-scale="battBig"></div>
+      <div class="stats side"><div class="stat"><span class="label">Min</span><b id="vMin">--</b></div><div class="stat"><span class="label">Max</span><b id="vMax">--</b></div></div>
+    </section>
+
+    <!-- LUFTMASSA -->
+    <section class="page p-air" data-name="Luftmassa">
+      <div class="head"><span class="label">Luftmassa · mg/c</span><span class="label" id="fDev">--</span></div>
+      <div class="air-cols">
+        <div class="air-col req"><span class="label">Begärd</span><div class="num" id="fReq">--</div><div class="air-bar"><i id="fReqBar"></i></div></div>
+        <div class="air-col act"><span class="label">Faktisk</span><div class="num" id="fAct">--</div><div class="air-bar"><i id="fActBar"></i></div></div>
+      </div>
+      <div class="stats">
+        <div class="stat"><span class="label">Etanol</span><b id="fEth">--</b></div>
+        <div class="stat"><span class="label">Tank</span><b id="fFuel">--</b></div>
+        <span class="badge" id="fAdapt">Adapterar</span>
+      </div>
+    </section>
+
+    <!-- FELKODER -->
+    <section class="page p-dtc" data-name="Felkoder">
+      <div class="head"><span class="label">Felkoder</span><span class="label" id="dCount">--</span></div>
+      <div class="dtc-list" id="dList"></div>
+      <div class="dtc-actions"><button id="dRead">Läs igen</button><span class="grow"></span><button id="dClear" class="danger">Radera felkoder</button></div>
+    </section>
+  </div>
+
+  <div class="strip bottom">
+    <button id="btnNight" aria-pressed="false">Night</button>
+    <span class="grow"></span>
+    <div class="dots" id="dots"></div>
+    <span class="grow"></span>
+    <button id="btnLog">Logg</button>
+  </div>
+</div>
+
+<button class="night-exit" id="btnNightExit">Night av</button>
+
+<div class="alert" id="alert" hidden>
+  <div class="t">FELKOD</div>
+  <svg viewBox="0 0 64 44" aria-hidden="true"><use href="#i-cel"/></svg>
+  <div class="c" id="alertCode">P0000</div>
+  <div class="h">Tryck för att stänga</div>
+</div>
+
+<div class="sheet" id="sheet" hidden>
+  <div class="head"><span class="label page-name">Felsökning</span><span class="grow"></span><button id="btnLogClear">Rensa</button><button id="btnLogClose">Stäng</button></div>
+  <div class="stats">
+    <div class="stat"><span class="label">Paket/s</span><b id="stRate">0</b></div>
+    <div class="stat"><span class="label">Tappade</span><b id="stLost">0</b></div>
+    <div class="stat"><span class="label">Senaste</span><b id="stAge">–</b></div>
+  </div>
+  <div class="stat"><span class="label">Rådata DATA</span><span class="hex" id="stHex">–</span></div>
+  <pre class="log" id="log"></pre>
+  <form class="cmd" id="cmdForm">
+    <input id="cmdIn" placeholder="Konsolkommando, t.ex. v" autocomplete="off" autocapitalize="off" spellcheck="false">
+    <button type="submit">Skicka</button>
+  </form>
+</div>
+
+<script>
+'use strict';
+/* ================= BLE protocol v1 (see PROTOCOL.md) ================= */
+const UUID = s => `7a5a${s}-5341-4142-9b3e-0c2a1d4e8f01`;
+const SVC = UUID('0001'), CH_DATA = UUID('0002'), CH_DTC = UUID('0003'), CH_CMD = UUID('0004'), CH_LOG = UUID('0005');
+const SLIDE = { MAIN: 0, BOOST: 1, SPEED: 2, TEMP: 3, VOLT: 4, AIRMASS: 5, DTC: 6 };
+
+function parseData(dv) {
+  if (dv.byteLength < 20 || dv.getUint8(0) !== 1) return null;
+  const f = dv.getUint8(1);
+  const u8 = (o, k = 1, off = 0) => { const v = dv.getUint8(o); return v === 0xFF ? null : (v - off) * k; };
+  const u16 = (o, k = 1) => { const v = dv.getUint16(o, true); return v === 0xFFFF ? null : v * k; };
+  const b = dv.getInt16(2, true);
+  return {
+    canAlive: !!(f & 1), adapt: !!(f & 2), cel: !!(f & 4), diag: !!(f & 8),
+    boost: b === 0x7FFF ? null : b / 1000,
+    rpm: u16(4), speed: u8(6), coolant: u8(7, 1, 40), iat: u8(8, 1, 40), batt: u8(9, 0.1),
+    airmReq: u16(10), airmAct: u16(12), afr: u16(14, 0.01),
+    ethanol: u8(16), fuel: u8(17), dtcCount: dv.getUint8(18), seq: dv.getUint8(19),
+  };
+}
+function encodeData(d, seq) { // used by demo mode; mirrors the firmware packer
+  const dv = new DataView(new ArrayBuffer(20));
+  const put8 = (o, v, k = 1, off = 0) => dv.setUint8(o, v == null ? 0xFF : Math.max(0, Math.min(254, Math.round(v / k + off))));
+  const put16 = (o, v, k = 1) => dv.setUint16(o, v == null ? 0xFFFF : Math.max(0, Math.min(65534, Math.round(v / k))), true);
+  dv.setUint8(0, 1);
+  dv.setUint8(1, (d.canAlive ? 1 : 0) | (d.adapt ? 2 : 0) | (d.cel ? 4 : 0) | (d.diag ? 8 : 0));
+  dv.setInt16(2, d.boost == null ? 0x7FFF : Math.round(d.boost * 1000), true);
+  put16(4, d.rpm); put8(6, d.speed); put8(7, d.coolant, 1, 40); put8(8, d.iat, 1, 40); put8(9, d.batt, 0.1);
+  put16(10, d.airmReq); put16(12, d.airmAct); put16(14, d.afr, 0.01);
+  put8(16, d.ethanol); put8(17, d.fuel); dv.setUint8(18, d.dtcCount || 0); dv.setUint8(19, seq & 0xFF);
+  return dv;
+}
+function parseDtc(dv) {
+  if (dv.byteLength < 2 || dv.getUint8(0) !== 1) return null;
+  const n = dv.getUint8(1), out = [];
+  for (let i = 0; i < n && 2 + i * 3 + 2 < dv.byteLength; i++) {
+    const raw = dv.getUint16(2 + i * 3, false);
+    out.push({ code: fmtDtc(raw), status: dv.getUint8(4 + i * 3) });
+  }
+  return out;
+}
+const fmtDtc = raw => 'PCBU'[raw >> 14] + ((raw >> 12) & 3) + (raw & 0xFFF).toString(16).toUpperCase().padStart(3, '0');
+
+/* ================= Linear scale component ================= */
+const $ = id => document.getElementById(id);
+const clamp01 = x => Math.max(0, Math.min(1, x));
+function makeScale(host, { lo, hi, step, major, zones = [], peak = false, labels = true }) {
+  const v = host.classList.contains('v'), pos = v ? 'bottom' : 'left', size = v ? 'height' : 'width';
+  const pct = x => (clamp01((x - lo) / (hi - lo)) * 100) + '%';
+  const add = (cls, parent = host) => { const e = document.createElement('div'); e.className = cls; parent.appendChild(e); return e; };
+  const rail = add('rail'), fill = add('fill', rail);
+  for (const z of zones) { const e = add('zone'); e.style[pos] = pct(z[0]); e.style[size] = `calc(${pct(z[1])} - ${pct(z[0])})`; e.style.background = z[2]; }
+  for (let x = lo, i = 0; x <= hi + 1e-9; x += step, i++) {
+    const big = Math.abs(((x - lo) / major) - Math.round((x - lo) / major)) < 1e-6;
+    const t = add('tk' + (big ? ' big' : '')); t.style[pos] = pct(x);
+    if (big && labels) { const l = add('lb' + (x - lo < 1e-9 ? ' first' : hi - x < 1e-9 ? ' last' : '')); l.style[pos] = pct(x); l.textContent = +x.toFixed(2) > 0 && lo < 0 ? '+' + +x.toFixed(2) : +x.toFixed(2); }
+  }
+  const mark = add('mark'), pk = peak ? add('peak') : null;
+  // zero-based fill for ranges that cross zero (boost)
+  const base = lo < 0 ? 0 : lo;
+  return {
+    set(val, color) {
+      if (val == null) { fill.style[size] = '0'; mark.style.display = 'none'; return; }
+      mark.style.display = ''; mark.style[pos] = pct(val);
+      const a = Math.min(val, base), b = Math.max(val, base);
+      fill.style[pos] = pct(a); fill.style[size] = `calc(${pct(b)} - ${pct(a)})`;
+      fill.style.background = color || 'var(--green)';
+    },
+    peak(val) { if (pk) { pk.style.display = val == null ? 'none' : ''; if (val != null) pk.style[pos] = pct(val); } },
+  };
+}
+
+/* ================= Build ================= */
+const slidesEl = $('slides'), pages = [...slidesEl.children];
+const sc = {}, tiles = {};
+const scaleDefs = {
+  boost:      { lo: -1, hi: 2, step: .5, major: 1 },
+  rpm:        { lo: 0, hi: 8000, step: 1000, major: 2000 },
+  coolant:    { lo: 40, hi: 130, step: 10, major: 30 },
+  batt:       { lo: 8, hi: 16, step: 1, major: 2 },
+  boostTape:  { lo: -1, hi: 2, step: .1, major: .5, peak: true, zones: [[-1, 0, 'var(--vac)'], [1.6, 2, 'var(--red)']] },
+  coolantBig: { lo: 40, hi: 130, step: 5, major: 10, zones: [[80, 105, 'var(--green-dim)'], [105, 115, 'var(--amber)'], [115, 130, 'var(--red)']] },
+  battBig:    { lo: 8, hi: 16, step: .5, major: 1, zones: [[8, 11.8, 'var(--red)'], [13.2, 14.8, 'var(--green-dim)'], [15.2, 16, 'var(--amber)']] },
+};
+document.querySelectorAll('[data-scale]').forEach(h => { sc[h.dataset.scale] = makeScale(h, scaleDefs[h.dataset.scale]); });
+document.querySelectorAll('.tile').forEach(t => { tiles[t.dataset.k] = t.querySelector('[data-v]'); });
+const SEGS = 40, seg = $('seg');
+for (let i = 0; i < SEGS; i++) { const s = document.createElement('i'); const r = (i + 1) / SEGS * 8000; if (r > 6000) s.className = 'r'; else if (r > 5000) s.className = 'a'; seg.appendChild(s); }
+// shared chrome per page: no-data banner + CEL lamp
+pages.forEach((p, i) => {
+  if (i !== SLIDE.DTC) {
+    const n = document.createElement('div'); n.className = 'nodata'; n.textContent = 'INGEN CAN-DATA'; n.hidden = true; p.appendChild(n);
+    const c = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); c.setAttribute('viewBox', '0 0 64 44'); c.setAttribute('class', 'cel');
+    c.innerHTML = '<use href="#i-cel"/>'; c.style.display = 'none'; p.appendChild(c);
+  }
+  $('dots').appendChild(document.createElement('i'));
+});
+
+
+/* ================= Landscape instruments (SVG dials) ================= */
+const SVGNS = 'http://www.w3.org/2000/svg';
+const sv = (tag, at, parent) => { const e = document.createElementNS(SVGNS, tag); for (const k in at) e.setAttribute(k, at[k]); if (parent) parent.appendChild(e); return e; };
+const P = (cx, cy, r, deg) => [cx + r * Math.cos(deg * Math.PI / 180), cy + r * Math.sin(deg * Math.PI / 180)];
+function arcPath(cx, cy, r, a, b) {
+  if (b - a < 0.01) return '';
+  const [x0, y0] = P(cx, cy, r, a), [x1, y1] = P(cx, cy, r, b);
+  return `M${x0.toFixed(1)} ${y0.toFixed(1)}A${r} ${r} 0 ${b - a > 180 ? 1 : 0} 1 ${x1.toFixed(1)} ${y1.toFixed(1)}`;
+}
+/* One round instrument. 240° sweep opening downwards, angles clockwise from 3 o'clock.
+   mode 'arc': a lit band grows from `base` to the value (modern cluster look).
+   mode 'needle': a slim red pointer over a fine scale (classic Saab look). */
+function makeDial(svg, o) {
+  const { cx, cy, r, lo, hi, base = lo, A = 150, S = 240, mode = 'arc' } = o;
+  const ang = v => A + S * clamp01((v - lo) / (hi - lo));
+  const g = sv('g', {}, svg);
+  sv('path', { d: arcPath(cx, cy, r, A, A + S), stroke: 'var(--rail)', 'stroke-width': o.w || 10, fill: 'none', 'stroke-linecap': 'butt' }, g);
+  for (const [z0, z1, c] of o.zones || []) sv('path', { d: arcPath(cx, cy, r + (o.w || 10) / 2 + 5, ang(z0), ang(z1)), stroke: c, 'stroke-width': 3, fill: 'none' }, g);
+  for (let v = lo; v <= hi + 1e-9; v += o.minor) {
+    const major = Math.abs((v - lo) / o.major - Math.round((v - lo) / o.major)) < 1e-6;
+    const a = ang(v), r0 = r - (o.w || 10) / 2 - 6, r1 = r0 - (major ? 16 : 8);
+    const [x0, y0] = P(cx, cy, r0, a), [x1, y1] = P(cx, cy, r1, a);
+    sv('line', { x1: x0, y1: y0, x2: x1, y2: y1, stroke: major ? 'var(--cap)' : 'var(--tick)', 'stroke-width': major ? 2.5 : 1.5, class: major ? '' : 'minor' }, g);
+    if (major) {
+      const [lx, ly] = P(cx, cy, mode === 'arc' ? r + (o.w || 10) / 2 + 24 : r1 - 18, a);
+      const t = sv('text', { x: lx, y: ly, 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-size': o.lsize || 17, fill: 'var(--dim)' }, g);
+      t.textContent = o.label ? o.label(v) : +v.toFixed(2);
+    }
+  }
+  const band = mode === 'arc' ? sv('path', { stroke: 'var(--green)', 'stroke-width': o.w || 10, fill: 'none' }, g) : null;
+  let needle = null;
+  if (mode === 'needle') {
+    needle = sv('g', {}, g);
+    sv('line', { x1: cx - r * 0.14, y1: cy, x2: cx + r - (o.w || 10) / 2 - 4, y2: cy, stroke: 'var(--red)', 'stroke-width': 4, 'stroke-linecap': 'round' }, needle);
+    sv('circle', { cx, cy, r: 13, fill: '#0b0b0b', stroke: 'var(--tick)', 'stroke-width': 2 }, g);
+  }
+  const txt = (y, size, fill, cls) => { const t = sv('text', { x: cx, y, 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-size': size, fill, class: cls || '' }, g); return t; };
+  return {
+    g, txt,
+    set(v, color) {
+      const has = v != null;
+      if (band) { band.setAttribute('d', has ? arcPath(cx, cy, r, Math.min(ang(base), ang(v)), Math.max(ang(base), ang(v))) : ''); band.setAttribute('stroke', color || 'var(--green)'); }
+      if (needle) { needle.style.display = has ? '' : 'none'; if (has) needle.setAttribute('transform', `rotate(${ang(v).toFixed(2)} ${cx} ${cy})`); }
+    },
+  };
+}
+const dials = {};
+function buildDials() {
+  const q = k => document.querySelector(`[data-dial="${k}"]`);
+  // LADDTRYCK
+  let s = q('boost'); s.setAttribute('viewBox', '0 0 440 330');
+  dials.boost = makeDial(s, { cx: 220, cy: 182, r: 132, lo: -1, hi: 2, base: 0, minor: 0.1, major: 0.5, w: 12,
+    zones: [[-1, 0, 'var(--vac)'], [1.6, 2, 'var(--red)']], label: v => Math.abs(v - Math.round(v)) < 1e-6 ? (v > 0 ? '+' : '') + Math.round(v) : '' });
+  dials.boost.val = dials.boost.txt(176, 104, 'var(--green)', 'big');
+  dials.boost.unit = dials.boost.txt(238, 16, 'var(--dim)'); dials.boost.unit.textContent = 'BAR';
+  dials.boost.sub = dials.boost.txt(312, 16, 'var(--dim)', 'sub');
+  // KYLVATTEN
+  s = q('temp'); s.setAttribute('viewBox', '0 0 440 330');
+  dials.temp = makeDial(s, { cx: 220, cy: 182, r: 132, lo: 40, hi: 130, minor: 5, major: 30, w: 12,
+    zones: [[80, 105, 'var(--green-dim)'], [105, 115, 'var(--amber)'], [115, 130, 'var(--red)']] });
+  dials.temp.val = dials.temp.txt(176, 104, 'var(--green)', 'big');
+  dials.temp.unit = dials.temp.txt(238, 16, 'var(--dim)'); dials.temp.unit.textContent = 'KYLVATTEN °C';
+  dials.temp.sub = dials.temp.txt(312, 16, 'var(--dim)', 'sub');
+  // BATTERI
+  s = q('volt'); s.setAttribute('viewBox', '0 0 440 330');
+  dials.volt = makeDial(s, { cx: 220, cy: 182, r: 132, lo: 8, hi: 16, minor: 0.5, major: 2, w: 12,
+    zones: [[8, 11.8, 'var(--red)'], [13.2, 14.8, 'var(--green-dim)'], [15.2, 16, 'var(--amber)']] });
+  dials.volt.val = dials.volt.txt(176, 104, 'var(--green)', 'big');
+  dials.volt.unit = dials.volt.txt(238, 16, 'var(--dim)'); dials.volt.unit.textContent = 'BATTERI V';
+  dials.volt.sub = dials.volt.txt(312, 16, 'var(--dim)', 'sub');
+  // FART: classic twin cluster, tach left, speedo right
+  s = q('speed'); s.setAttribute('viewBox', '0 0 860 340');
+  dials.rpm = makeDial(s, { cx: 205, cy: 180, r: 160, lo: 0, hi: 8, minor: 0.25, major: 1, mode: 'needle', w: 6, lsize: 22, zones: [[6, 8, 'var(--red)']] });
+  dials.rpm.val = dials.rpm.txt(262, 44, 'var(--cap)', 'big');
+  dials.rpm.txt(300, 14, 'var(--dim)').textContent = 'VARV/MIN';
+  dials.rpm.txt(120, 14, 'var(--dim)').textContent = '×1000';
+  dials.rpm.g.classList.add('tach');
+  dials.kmh = makeDial(s, { cx: 655, cy: 180, r: 160, lo: 0, hi: 240, minor: 10, major: 20, mode: 'needle', w: 6, lsize: 18,
+    label: v => v % 40 === 0 ? v : '' });
+  dials.kmh.val = dials.kmh.txt(256, 68, 'var(--green)', 'big');
+  dials.kmh.txt(300, 14, 'var(--dim)').textContent = 'KM/H';
+}
+buildDials();
+
+/* ================= State + rendering ================= */
+const state = { d: null, last: 0, dtcs: [], knownDtc: null, slide: -1, mode: 'demo' };
+const sess = { bMax: null, tMin: null, tMax: null, vMin: null, vMax: null };
+const disp = { boost: 0, rpm: 0, speed: 0 };
+const fmt = (v, dp, dash = '--') => v == null ? dash : v.toFixed(dp);
+const set = (node, s) => { if (node.textContent !== s) node.textContent = s; };
+const cls = (node, c) => { node.classList.remove('vac', 'warn', 'crit'); if (c) node.classList.add(c); };
+const mm = (k, v, f) => { if (v != null) sess[k] = sess[k] == null ? v : f(sess[k], v); };
+
+function render() {
+  const d = state.d || {}, live = !!state.d && d.canAlive && performance.now() - state.last < 1500;
+  if (d.boost != null) disp.boost += (d.boost - disp.boost) * 0.35;
+  if (d.rpm != null) disp.rpm += (d.rpm - disp.rpm) * 0.35;
+  if (d.speed != null) disp.speed += (d.speed - disp.speed) * 0.35;
+  if (live) { mm('bMax', d.boost, Math.max); mm('tMin', d.coolant, Math.min); mm('tMax', d.coolant, Math.max); mm('vMin', d.batt, Math.min); mm('vMax', d.batt, Math.max); }
+  document.querySelectorAll('.nodata').forEach(n => { n.hidden = live; });
+  document.querySelectorAll('.cel').forEach(n => { n.style.display = d.cel ? '' : 'none'; });
+
+  const L = (v, dp) => live ? fmt(v, dp) : '--';
+  const tC = c => c == null ? '' : c >= 115 ? 'crit' : c >= 105 ? 'warn' : '';
+  const vC = v => v == null ? '' : v < 11.8 ? 'crit' : v > 15.2 ? 'warn' : '';
+  const bC = b => b != null && b < 0 ? 'vac' : b >= 1.6 ? 'crit' : '';
+  const col = c => c === 'crit' ? 'var(--red)' : c === 'warn' ? 'var(--amber)' : c === 'vac' ? 'var(--vac)' : 'var(--green)';
+
+  // ÖVERSIKT
+  set(tiles.boost, L(d.boost, 2)); cls(tiles.boost, live && bC(d.boost)); sc.boost.set(live ? disp.boost : null, col(live && bC(d.boost)));
+  set(tiles.rpm, L(d.rpm, 0)); sc.rpm.set(live ? disp.rpm : null, live && d.rpm > 6000 ? 'var(--red)' : null);
+  set(tiles.coolant, L(d.coolant, 0)); cls(tiles.coolant, live && tC(d.coolant)); sc.coolant.set(live ? d.coolant : null, col(live && tC(d.coolant)));
+  set(tiles.batt, L(d.batt, 1)); cls(tiles.batt, live && vC(d.batt)); sc.batt.set(live ? d.batt : null, col(live && vC(d.batt)));
+
+  // LADDTRYCK
+  set($('bVal'), L(d.boost, 2)); cls($('bVal'), live && bC(d.boost));
+  sc.boostTape.set(live ? disp.boost : null, col(live && bC(d.boost))); sc.boostTape.peak(sess.bMax);
+  set($('bMax'), fmt(sess.bMax, 2)); set($('bIat'), L(d.iat, 0)); set($('bAfr'), L(d.afr, 1));
+  document.querySelectorAll('[data-dup]').forEach(n => set(n, $(n.dataset.dup).textContent));
+
+  // FART
+  set($('sVal'), L(d.speed, 0)); set($('sRpm'), L(d.rpm, 0)); set($('sBoost'), L(d.boost, 2));
+  const lit = live ? Math.round(disp.rpm / 8000 * SEGS) : 0;
+  seg.parentElement.classList.toggle('hot', live && d.rpm >= 5000);
+  for (let i = 0; i < SEGS; i++) seg.children[i].classList.toggle('on', i < lit);
+
+  // KYLVATTEN / BATTERI
+  set($('tVal'), L(d.coolant, 0)); cls($('tVal'), live && tC(d.coolant)); sc.coolantBig.set(live ? d.coolant : null, col(live && tC(d.coolant)));
+  set($('tMin'), fmt(sess.tMin, 0)); set($('tMax'), fmt(sess.tMax, 0)); set($('tIat'), L(d.iat, 0));
+  set($('tState'), !live ? '--' : d.coolant < 70 ? 'Kall motor' : tC(d.coolant) === 'crit' ? 'För varm' : tC(d.coolant) ? 'Varm' : 'Normal');
+  set($('vVal'), L(d.batt, 1)); cls($('vVal'), live && vC(d.batt)); sc.battBig.set(live ? d.batt : null, col(live && vC(d.batt)));
+  set($('vMin'), fmt(sess.vMin, 1)); set($('vMax'), fmt(sess.vMax, 1));
+  set($('vState'), !live ? '--' : d.batt < 11.8 ? 'Låg spänning' : d.batt > 15.2 ? 'Hög spänning' : d.batt >= 13.2 ? 'Laddar' : 'Laddar ej');
+
+  // LUFTMASSA
+  set($('fReq'), L(d.airmReq, 0)); set($('fAct'), L(d.airmAct, 0));
+  $('fReqBar').style.setProperty('--p', (live && d.airmReq != null ? clamp01(d.airmReq / 1400) * 100 : 0) + '%');
+  $('fActBar').style.setProperty('--p', (live && d.airmAct != null ? clamp01(d.airmAct / 1400) * 100 : 0) + '%');
+  const dev = live && d.airmReq && d.airmAct != null ? (d.airmAct - d.airmReq) / d.airmReq * 100 : null;
+  set($('fDev'), dev == null ? '--' : `Avvikelse ${dev > 0 ? '+' : ''}${dev.toFixed(0)} %`);
+  set($('fEth'), live && d.ethanol != null ? d.ethanol + ' %' : '--');
+  set($('fFuel'), live && d.fuel != null ? d.fuel + ' %' : '--');
+  $('fAdapt').hidden = !(live && d.adapt);
+
+  // landscape dials
+  if (matchMedia('(orientation: landscape)').matches) {
+    dials.boost.set(live ? disp.boost : null, col(live && bC(d.boost))); set(dials.boost.val, L(d.boost, 2));
+    dials.boost.val.setAttribute('fill', col(live && bC(d.boost)));
+    set(dials.boost.sub, `MAX ${fmt(sess.bMax, 2)}   ·   IAT ${L(d.iat, 0)}°   ·   AFR ${L(d.afr, 1)}`);
+    dials.temp.set(live ? d.coolant : null, col(live && tC(d.coolant))); set(dials.temp.val, L(d.coolant, 0));
+    dials.temp.val.setAttribute('fill', col(live && tC(d.coolant)));
+    set(dials.temp.sub, $('tState').textContent.toUpperCase());
+    dials.volt.set(live ? d.batt : null, col(live && vC(d.batt))); set(dials.volt.val, L(d.batt, 1));
+    dials.volt.val.setAttribute('fill', col(live && vC(d.batt)));
+    set(dials.volt.sub, $('vState').textContent.toUpperCase());
+    dials.rpm.set(live ? disp.rpm / 1000 : null); set(dials.rpm.val, L(d.rpm, 0));
+    dials.kmh.set(live ? disp.speed : null); set(dials.kmh.val, L(d.speed, 0));
+  }
+
+  requestAnimationFrame(render);
+}
+$('bReset').onclick = () => { sess.bMax = null; };
+
+function renderDtc() {
+  const list = state.dtcs, box = $('dList');
+  set($('dCount'), list.length ? `${list.length} st` : 'Inga');
+  box.textContent = '';
+  if (!list.length) box.innerHTML = '<div class="dtc-empty"><svg viewBox="0 0 64 44"><use href="#i-cel"/></svg>INGA FELKODER</div>';
+  for (const x of list) {
+    const r = document.createElement('div'); r.className = 'dtc-row';
+    r.innerHTML = `<span class="num"></span><span class="grow"></span><span class="label"></span>`;
+    r.children[0].textContent = x.code; r.children[2].textContent = 'Status ' + x.status.toString(16).toUpperCase().padStart(2, '0');
+    box.appendChild(r);
+  }
+  $('dClear').disabled = !list.length;
+  if (state.knownDtc) { const fresh = list.find(x => !state.knownDtc.has(x.code)); if (fresh) showAlert(fresh.code); }
+  state.knownDtc = new Set(list.map(x => x.code));
+}
+let alertTimer = 0;
+function showAlert(code) { $('alertCode').textContent = code; $('alert').hidden = false; clearTimeout(alertTimer); alertTimer = setTimeout(hideAlert, 15000); }
+function hideAlert() { clearTimeout(alertTimer); $('alert').hidden = true; }
+$('alert').addEventListener('click', hideAlert);
+
+let clearArmed = 0;
+$('dRead').onclick = () => { sendCmd([0x02]); log('Begär felkoder'); };
+$('dClear').onclick = () => {
+  const b = $('dClear');
+  if (!clearArmed) { b.textContent = 'Tryck igen för att radera'; clearArmed = setTimeout(() => { clearArmed = 0; b.textContent = 'Radera felkoder'; }, 3000); return; }
+  clearTimeout(clearArmed); clearArmed = 0; b.textContent = 'Radera felkoder';
+  if (state.mode === 'demo') { demo.dtcs = []; demoPushDtc(); } else sendCmd([0x01]);
+  log('Radera felkoder skickat');
+};
+
+/* incoming data (BLE or demo) */
+let rx = 0, lost = 0, lastSeq = null, lastHex = '';
+function onData(dv) {
+  const d = parseData(dv);
+  if (!d) { log('DATA: okänt format, ' + dv.byteLength + ' byte'); return; }
+  if (lastSeq != null && ((lastSeq + 1) & 0xFF) !== d.seq) lost += (d.seq - lastSeq - 1 + 256) & 0xFF;
+  lastSeq = d.seq; rx++;
+  state.d = d; state.last = performance.now();
+  if (!sheet.hidden) lastHex = [...new Uint8Array(dv.buffer, dv.byteOffset, dv.byteLength)].map(b => b.toString(16).padStart(2, '0')).join(' ');
+}
+function onDtc(dv) {
+  const list = parseDtc(dv);
+  if (!list) { log('DTC: okänt format'); return; }
+  state.dtcs = list; log(`DTC: ${list.length ? list.map(x => x.code).join(', ') : 'inga'}`); renderDtc();
+}
+
+/* ================= Navigation ================= */
+function onSlideChange() {
+  const i = Math.round(slidesEl.scrollLeft / slidesEl.clientWidth);
+  if (i === state.slide) return;
+  state.slide = i;
+  [...$('dots').children].forEach((d, k) => d.classList.toggle('on', k === i));
+  $('pageName').textContent = pages[i].dataset.name;
+  sendCmd([0x10, i]);
+  try { localStorage.setItem('saab.slide', i); } catch (e) {}
+}
+slidesEl.addEventListener('scroll', () => { clearTimeout(slidesEl._t); slidesEl._t = setTimeout(onSlideChange, 80); });
+function goSlide(i, smooth) { slidesEl.scrollTo({ left: i * slidesEl.clientWidth, behavior: smooth ? 'smooth' : 'instant' }); if (!smooth) onSlideChange(); }
+// tap empty page area = next page (like the touch display); buttons keep their own action
+let downX = 0;
+slidesEl.addEventListener('pointerdown', e => { downX = e.clientX; });
+slidesEl.addEventListener('click', e => {
+  if (Math.abs(e.clientX - downX) > 8 || e.target.closest('button, .dtc-list')) return;
+  goSlide((state.slide + 1) % pages.length, true);
+});
+window.addEventListener('resize', () => slidesEl.scrollTo({ left: state.slide * slidesEl.clientWidth }));
+
+/* ================= Bluetooth ================= */
+const ble = { dev: null, cmd: null, want: false, tries: 0 };
+const chip = $('chip'), chipTxt = $('chipTxt'), btnConn = $('btnConn'), btnDemo = $('btnDemo');
+function setStatus(s, t) { chip.dataset.s = s; chipTxt.textContent = t; }
+
+async function connect() {
+  if (!navigator.bluetooth) {
+    log('Webbläsaren saknar Web Bluetooth. Öppna sidan i Bluefy på iPhone (eller Chrome på dator/Android).');
+    setStatus('off', 'Ingen Bluetooth'); openSheet(); return;
+  }
+  try {
+    const dev = await navigator.bluetooth.requestDevice({ filters: [{ services: [SVC] }, { namePrefix: 'SAAB' }], optionalServices: [SVC] });
+    stopDemo();
+    ble.dev = dev; ble.want = true; ble.tries = 0;
+    dev.addEventListener('gattserverdisconnected', onDisconnect);
+    await attach();
+  } catch (e) { log('Anslutning avbruten: ' + e.message); if (!ble.dev) setStatus(state.mode === 'demo' ? 'demo' : 'off', state.mode === 'demo' ? 'Demo' : 'Ej ansluten'); }
+}
+async function attach() {
+  setStatus('wait', 'Ansluter…');
+  const srv = await ble.dev.gatt.connect();
+  const svc = await srv.getPrimaryService(SVC);
+  const sub = async (uuid, fn, required) => {
+    try { const c = await svc.getCharacteristic(uuid); c.addEventListener('characteristicvaluechanged', e => fn(e.target.value)); await c.startNotifications(); return c; }
+    catch (e) { if (required) throw e; log(`Saknar ${uuid.slice(4, 8)}: ${e.message}`); }
+  };
+  await sub(CH_DATA, onData, true);
+  const dtc = await sub(CH_DTC, onDtc);
+  await sub(CH_LOG, dv => log('» ' + new TextDecoder().decode(dv).replace(/\s+$/, '')));
+  try { ble.cmd = await svc.getCharacteristic(CH_CMD); } catch (e) { ble.cmd = null; log('Saknar CMD'); }
+  if (dtc) try { onDtc(await dtc.readValue()); } catch (e) {}
+  state.mode = 'ble'; ble.tries = 0; lastSeq = null;
+  setStatus('on', ble.dev.name || 'Ansluten'); btnConn.textContent = 'Koppla från';
+  log('Ansluten till ' + (ble.dev.name || 'dongel'));
+  sendCmd([0x10, state.slide]);
+  keepAwake();
+}
+function onDisconnect() {
+  ble.cmd = null;
+  if (!ble.want) return;
+  const wait = Math.min(8000, 500 * 2 ** ble.tries++);
+  setStatus('wait', 'Återansluter…'); log(`Tappade anslutningen, nytt försök om ${wait / 1000} s`);
+  setTimeout(() => { if (ble.want) attach().catch(e => { log('Återanslutning misslyckades: ' + e.message); onDisconnect(); }); }, wait);
+}
+function disconnect() {
+  ble.want = false;
+  if (ble.dev?.gatt.connected) ble.dev.gatt.disconnect();
+  ble.dev = null; ble.cmd = null; state.mode = 'off'; state.d = null;
+  setStatus('off', 'Ej ansluten'); btnConn.textContent = 'Anslut'; log('Frånkopplad');
+}
+let cmdQ = Promise.resolve();
+function sendCmd(bytes) {
+  if (state.mode !== 'ble' || !ble.cmd) return;
+  const buf = new Uint8Array(bytes);
+  cmdQ = cmdQ.then(() => ble.cmd.writeValueWithoutResponse ? ble.cmd.writeValueWithoutResponse(buf) : ble.cmd.writeValue(buf))
+             .catch(e => log('CMD-fel: ' + e.message));
+}
+btnConn.onclick = () => (state.mode === 'ble' || ble.want) ? disconnect() : connect();
+
+let wake = null;
+async function keepAwake() { try { if (!wake && navigator.wakeLock) { wake = await navigator.wakeLock.request('screen'); wake.addEventListener('release', () => { wake = null; }); } } catch (e) {} }
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && state.mode !== 'off') keepAwake(); });
+
+/* ================= Demo mode: simulated T8 on E85 ================= */
+const demo = { timer: 0, t: 0, seq: 0, dtcs: [], coolant: 62, alerted: false };
+function demoPushDtc() {
+  const dv = new DataView(new ArrayBuffer(2 + demo.dtcs.length * 3));
+  dv.setUint8(0, 1); dv.setUint8(1, demo.dtcs.length);
+  demo.dtcs.forEach((x, i) => { dv.setUint16(2 + i * 3, x[0], false); dv.setUint8(4 + i * 3, x[1]); });
+  onDtc(dv);
+}
+function startDemo() {
+  if (demo.timer) return;
+  state.mode = 'demo'; setStatus('demo', 'Demo'); btnDemo.setAttribute('aria-pressed', 'true');
+  demo.t = 0; demo.alerted = false; demo.dtcs = []; demoPushDtc();
+  demo.timer = setInterval(() => {
+    demo.t += 0.05;
+    const t = demo.t, cyc = t % 16;                 // 16 s loop: idle → pull → lift → cruise
+    const load = cyc < 3 ? 0 : cyc < 8 ? (cyc - 3) / 5 : cyc < 10 ? -0.2 : 0.25;
+    const rpm = cyc < 3 ? 850 + 30 * Math.sin(t * 3) : cyc < 8 ? 1800 + 4300 * (cyc - 3) / 5 : cyc < 10 ? 2600 - 400 * (cyc - 8) : 2200 + 50 * Math.sin(t);
+    const boost = load <= 0 ? -0.62 + 0.03 * Math.sin(t * 2) : Math.min(1.45, -0.4 + 2.1 * load) + 0.03 * Math.sin(t * 9);
+    demo.coolant = Math.min(91, demo.coolant + 0.01);
+    const req = Math.max(90, Math.round(120 + 1050 * Math.max(0, load)));
+    const d = {
+      canAlive: true, adapt: t > 20 && t < 28, cel: demo.dtcs.length > 0, diag: state.slide === SLIDE.AIRMASS,
+      boost, rpm, speed: cyc < 3 ? 0 : Math.min(160, 40 + 18 * (cyc - 3) + (cyc > 8 ? 30 : 0)),
+      coolant: demo.coolant, iat: 24 + 10 * Math.max(0, load), batt: 14.1 + 0.05 * Math.sin(t / 3),
+      airmReq: req, airmAct: Math.round(req * (0.96 + 0.03 * Math.sin(t * 4))), afr: 9.83 + (load > 0.6 ? -1.6 : 0) + 0.08 * Math.sin(t * 5),
+      ethanol: 78, fuel: 54, dtcCount: demo.dtcs.length,
+    };
+    onData(encodeData(d, demo.seq++));
+    if (!demo.alerted && t > 30) { demo.alerted = true; demo.dtcs = [[0x0171, 0x48]]; demoPushDtc(); log('Demo: simulerad felkod P0171'); }
+  }, 50);
+  keepAwake(); log('Demoläge startat (simulerad data)');
+}
+function stopDemo() { clearInterval(demo.timer); demo.timer = 0; btnDemo.setAttribute('aria-pressed', 'false'); if (state.mode === 'demo') { state.mode = 'off'; state.d = null; setStatus('off', 'Ej ansluten'); } }
+btnDemo.onclick = () => {
+  if (demo.timer) { stopDemo(); return; }
+  if (state.mode === 'ble' || ble.want) disconnect();
+  startDemo();
+};
+
+/* ================= Night + log sheet ================= */
+const btnNight = $('btnNight'), speedSvg = document.querySelector('[data-dial="speed"]');
+function setNight(on) {
+  document.body.classList.toggle('night', on); btnNight.setAttribute('aria-pressed', String(on));
+  speedSvg.setAttribute('viewBox', on ? '450 0 410 340' : '0 0 860 340'); // night: speedometer only
+  requestAnimationFrame(() => slidesEl.scrollTo({ left: state.slide * slidesEl.clientWidth }));
+  try { localStorage.setItem('saab.night', on ? '1' : ''); } catch (e) {}
+}
+btnNight.onclick = () => setNight(true);
+$('btnNightExit').onclick = () => setNight(false);
+
+const sheet = $('sheet'), logEl = $('log'), lines = [];
+function log(s) {
+  lines.push(`${new Date().toLocaleTimeString('sv-SE')}  ${s}`); if (lines.length > 300) lines.shift();
+  if (!sheet.hidden) { logEl.textContent = lines.join('\n'); logEl.scrollTop = logEl.scrollHeight; }
+}
+function openSheet() { sheet.hidden = false; logEl.textContent = lines.join('\n'); logEl.scrollTop = logEl.scrollHeight; }
+$('btnLog').onclick = () => sheet.hidden ? openSheet() : (sheet.hidden = true);
+$('btnLogClose').onclick = () => { sheet.hidden = true; };
+$('btnLogClear').onclick = () => { lines.length = 0; lost = 0; logEl.textContent = ''; };
+$('cmdForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const v = $('cmdIn').value.trim(); if (!v) return;
+  if (state.mode !== 'ble') { log('Kommandon kräver anslutning till dongeln'); return; }
+  sendCmd([0x30, ...new TextEncoder().encode(v)]); log('« ' + v); $('cmdIn').value = '';
+});
+setInterval(() => {
+  $('stRate').textContent = rx; rx = 0; $('stLost').textContent = lost;
+  $('stAge').textContent = state.last ? ((performance.now() - state.last) / 1000).toFixed(1) + ' s' : '–';
+  $('stHex').textContent = lastHex || '–';
+}, 1000);
+
+/* ================= Boot ================= */
+let startSlide = 0; try { startSlide = +localStorage.getItem('saab.slide') || 0; setNight(!!localStorage.getItem('saab.night')); } catch (e) {}
+renderDtc();
+startDemo();
+requestAnimationFrame(() => { goSlide(Math.min(startSlide, pages.length - 1)); render(); });
+if (!navigator.bluetooth) log('Obs: Web Bluetooth saknas i den här webbläsaren. På iPhone: öppna sidan i appen Bluefy.');
+</script>
+
+</body>
+</html>
