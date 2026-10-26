@@ -1,0 +1,30 @@
+name: Firmware
+
+on:
+  push:
+    paths: ['firmware/**', 'docs/**', '.github/workflows/firmware.yml']
+  pull_request:
+    paths: ['firmware/**', 'docs/**', '.github/workflows/firmware.yml']
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: v5.3.2
+          target: esp32c3
+          path: firmware
+      - uses: actions/upload-artifact@v4
+        with:
+          name: saab-dash-firmware
+          # saab-dash.bin is what POST /api/ota takes; the rest is for a first flash over USB
+          path: |
+            firmware/build/saab-dash.bin
+            firmware/build/bootloader/bootloader.bin
+            firmware/build/partition_table/partition-table.bin
+            firmware/build/ota_data_initial.bin
+            firmware/build/storage.bin
+            firmware/build/flash_args
