@@ -1,6 +1,6 @@
 <title>Saab Dash</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@300;500&family=Barlow+Semi+Condensed:wght@400;500;600&family=Saira+Semi+Condensed:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600&family=Saira:wght@400;500&display=swap">
 <style>
 /* Layout: full-bleed instrument pages swiped sideways. Each page is a size container; numbers scale with
    min(cqw,cqh) so the same page works upright and sideways in a phone holder. Saab night-panel palette:
@@ -19,8 +19,9 @@
   --cap: #c8c8c8;
   --dim: #7d857f;
   --tick: #3c443e;
-  --num: "Barlow Condensed", "Arial Narrow", "Helvetica Neue", system-ui, sans-serif;
-  --scale-font: "Saira Semi Condensed", "Barlow Semi Condensed", "Arial Narrow", sans-serif;
+  /* wide, softly squared numerals in the spirit of Saab clusters (not the narrow DIN look) */
+  --num: "Saira", "Helvetica Neue", system-ui, sans-serif;
+  --scale-font: "Saira", "Barlow Semi Condensed", sans-serif;
   --font: "Barlow Semi Condensed", "Arial Narrow", "Helvetica Neue", system-ui, sans-serif;
   color-scheme: dark;
 }
@@ -48,17 +49,15 @@ body.night .night-exit {
   color: var(--dim); border-color: var(--line); padding: 6px 10px; font-size: 11px;
 }
 /* per page: keep the value (and its bar/dial), drop the rest */
-body.night .tile .scale,
-body.night .p-boost .hero .stats, body.night .p-boost .side, body.night .p-boost .reset,
-body.night .p-speed .foot,
-body.night .p-gauge .stats, body.night .p-gauge .scale .lb,
-body.night .p-air .air-bar, body.night .p-air .stats, body.night #fDev,
+body.night .tile .scale, body.night .kv, body.night .p-dial .reset, body.night .air-bar,
 body.night .scale .tk:not(.big), body.night .scale .lb { display: none !important; }
-body.night .p-speed .seg-wrap:not(.hot) { visibility: hidden; }
 body.night .dtc-actions { display: none; }
-body.night .air-col { grid-template-rows: auto auto; align-content: center; }
+body.night .air-col { grid-template-rows: auto minmax(0, 1fr); }
 body.night .air-col.req .num, body.night .air-col.req .label { color: #8a4400; } /* identity colour, not a warning */
+body.night .p-air .badge { visibility: hidden; }
+body.night .p-dial { grid-template-columns: minmax(0, 1fr); }
 body.night .ldial .minor, body.night .ldial .sub, body.night .ldial .tach { display: none; }
+body.night .ldial .bezel { opacity: .35; }
 
 
 /* ---------- chrome: one slim strip on top, one at the bottom ---------- */
@@ -75,7 +74,8 @@ body.night .ldial .minor, body.night .ldial .sub, body.night .ldial .tach { disp
 .chip[data-s="on"] { color: var(--green); } .chip[data-s="on"] i { background: var(--green); box-shadow: 0 0 6px var(--green); }
 .chip[data-s="wait"] { color: var(--amber); } .chip[data-s="wait"] i { background: var(--amber); }
 .chip[data-s="demo"] { color: var(--vac); } .chip[data-s="demo"] i { background: var(--vac); }
-.page-name { color: var(--green); }
+.page-name { color: var(--green); min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.strip button { white-space: nowrap; }
 button {
   font: 500 13px var(--font); letter-spacing: .1em; text-transform: uppercase; color: var(--cap);
   background: transparent; border: 1px solid var(--line); border-radius: 4px; padding: 7px 11px; cursor: pointer;
@@ -100,7 +100,6 @@ button:disabled { opacity: .35; }
 .num { font-family: var(--num); font-weight: 500; line-height: .86; color: var(--green); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
 .num { white-space: nowrap; }
 .num .u { font-size: max(.3em, 14px); font-weight: 500; color: var(--dim); letter-spacing: .04em; margin-left: .18em; }
-.unit { font-size: 15px; letter-spacing: .12em; color: var(--dim); text-transform: uppercase; }
 .stage { flex: 1; min-height: 0; display: flex; position: relative; }
 .stage > .slides { flex: 1; }
 .nodata {
@@ -110,9 +109,8 @@ button:disabled { opacity: .35; }
 .cel-lamp { width: 26px; height: 18px; fill: var(--cel); display: none; flex: none; }
 body.cel .strip .cel-lamp { display: block; }
 .cel-night { position: absolute; left: 16px; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); z-index: 2; width: 30px; height: 21px; pointer-events: none; }
-body.night .p-gauge { padding-bottom: 48px; } /* keep the bar clear of the lamp and the exit button */
+body.night .page { padding-bottom: 48px; } /* keep the instrument clear of the lamp and the exit button */
 body.night.cel .cel-night { display: block; }
-body.night #tState, body.night #vState { display: none; }
 .vac { color: var(--vac) !important; } .warn { color: var(--amber) !important; } .crit { color: var(--red) !important; }
 
 /* stat row: small label / value pairs */
@@ -148,44 +146,48 @@ body.night #tState, body.night #vState { display: none; }
 .scale.v .tk { left: 22px; height: 1px; width: 7px; } .scale.v .tk.big { width: 12px; height: 2px; }
 .scale.v .lb { left: 38px; transform: translateY(50%); }
 
-/* ÖVERSIKT: 2×2 tiles split by hairlines */
-.p-main { grid-template: 1.5fr 1fr / repeat(3, minmax(0, 1fr)); gap: 0; padding: 0; }
-.tile { display: grid; grid-template-rows: auto 1fr auto; padding: 16px; gap: 6px; min-width: 0; min-height: 0; container-type: size; border-color: var(--line); border-style: solid; border-width: 0; }
-.p-main .tile[data-k="boost"] { grid-column: 1 / 4; border-bottom-width: 1px; }
-.p-main .tile[data-k="rpm"], .p-main .tile[data-k="coolant"] { border-right-width: 1px; }
+/* key values under (portrait) or beside (landscape) an instrument: big numbers in ruled cells */
+.kv { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); border-top: 1px solid var(--line); }
+.kv .stat { align-content: start; gap: 6px; padding: 12px 0 2px 14px; border-left: 1px solid var(--line); min-width: 0; }
+.kv .stat:first-child { border-left: 0; padding-left: 0; }
+.kv .stat b { font-size: clamp(26px, 11cqw, 54px); white-space: nowrap; }
+.p-air .kv .stat b { font-size: clamp(22px, 8cqw, 44px); }
+
+/* round instruments (SVG), used in both orientations */
+.ldial { display: block; width: 100%; height: 100%; min-height: 0; overflow: visible; }
+.ldial text { font-family: var(--font); font-variant-numeric: tabular-nums; }
+.ldial text.sc { font-family: var(--scale-font); font-weight: 500; }
+.ldial .big { font-family: var(--num); font-weight: 500; }
+@media (orientation: portrait) { .l-only { display: none !important; } }
+@media (orientation: landscape) { .p-only { display: none !important; } }
+
+/* ÖVERSIKT: boost on top, then one full-width row each (label + bar left, number right) */
+.p-main { grid-template-rows: 1.4fr repeat(3, minmax(0, 1fr)); gap: 0; padding: 0 16px; }
+.tile { display: grid; grid-template-rows: auto 1fr auto; padding: 14px 0; gap: 6px; min-width: 0; min-height: 0; container-type: size; border-color: var(--line); border-style: solid; border-width: 0; }
+.p-main .tile + .tile { border-top-width: 1px; }
 .tile .num { font-size: min(34cqw, 40cqh); align-self: center; }
 .p-main .tile[data-k="boost"] .num { font-size: min(40cqw, 56cqh); }
+.p-main .tile:not([data-k="boost"]) { grid-template: auto 1fr / minmax(0, 1fr) auto; column-gap: 20px; }
+.p-main .tile:not([data-k="boost"]) .num { grid-area: 1 / 2 / 3 / 3; font-size: min(66cqh, 30cqw); }
+.p-main .tile:not([data-k="boost"]) .scale { align-self: end; margin-bottom: 6px; }
 .tile .scale.h { height: 14px; } .tile .scale .lb, .tile .scale .tk { display: none; }
 .tile-head { display: flex; justify-content: space-between; }
 
-/* LADDTRYCK: hero number + tall tape */
-.p-boost { grid-template: 1fr auto / 1fr auto; }
-.p-boost .hero { display: grid; align-content: center; gap: 10px; min-width: 0; }
-.p-boost .hero .num { font-size: min(34cqw, 38cqh); }
-.p-boost .scale.v { grid-row: 1 / 3; grid-column: 2; margin: 6px 0 10px; }
+/* LADDTRYCK / MOTORTEMP / BATTERI: instrument + key values */
+.p-dial { grid-template-rows: auto auto auto; align-content: center; row-gap: 18px; }
+.p-dial .ldial { height: auto; max-height: 100%; }
+.p-dial .reset { justify-self: start; }
 
-/* FART: shift-light rpm strip + huge speed */
-.p-speed { grid-template-rows: auto 1fr auto; }
-.seg { display: flex; gap: 3px; height: min(9cqh, 54px); }
-.seg i { flex: 1; background: var(--rail); border-radius: 2px; }
-.seg i.on { background: var(--green); } .seg i.on.a { background: var(--amber); } .seg i.on.r { background: var(--red); }
-.seg-scale { display: flex; justify-content: space-between; margin-top: 6px; font-size: 13px; color: var(--dim); font-variant-numeric: tabular-nums; }
-.p-speed .hero { display: grid; place-content: center; text-align: center; gap: 8px; }
-.p-speed .hero .num { font-size: min(52cqw, 40cqh); }
-.p-speed .foot { display: flex; justify-content: space-between; align-items: flex-end; }
+/* FART: tach above speedometer when upright */
+.p-speed { grid-template-rows: minmax(0, 1fr) auto; }
 
-/* MOTORTEMP / BATTERI */
-.p-gauge { grid-template-rows: auto 1fr auto auto; }
-.p-gauge .hero { display: grid; align-content: center; gap: 10px; }
-.p-gauge .hero .num { font-size: min(50cqw, 34cqh); }
-
-/* LUFTMASSA: two columns with comparable bars */
-.p-air { grid-template-rows: auto 1fr auto; }
-.air-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; min-height: 0; }
-.air-col { display: grid; grid-template-rows: auto auto 1fr; gap: 8px; min-width: 0; }
-.air-col .num { font-size: min(17cqw, 15cqh); }
-.air-bar { position: relative; background: var(--rail); border-radius: 2px; min-height: 40px; overflow: hidden; }
-.air-bar i { position: absolute; left: 0; right: 0; bottom: 0; height: var(--p, 0%); }
+/* LUFTMASSA: requested vs actual as two big rows with comparable bars */
+.p-air { grid-template-rows: auto minmax(0, 1fr) auto; gap: 8px; }
+.air-cols { display: grid; grid-template-rows: 1fr 1fr; min-height: 0; }
+.air-col { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 6px; min-width: 0; min-height: 0; padding: 12px 0; container-type: size; border-top: 1px solid var(--line); }
+.air-col .num { font-size: min(40cqw, 58cqh); align-self: center; }
+.air-bar { position: relative; background: var(--rail); border-radius: 2px; height: 14px; overflow: hidden; }
+.air-bar i { position: absolute; left: 0; top: 0; bottom: 0; width: var(--p, 0%); }
 .air-col.req .num, .air-col.req .label { color: var(--amber); } .air-col.req .air-bar i { background: var(--amber); }
 .air-col.act .num, .air-col.act .label { color: var(--green); } .air-col.act .air-bar i { background: var(--green); }
 .badge { font-size: 12px; letter-spacing: .14em; color: var(--amber); border: 1px solid #4a2600; padding: 3px 7px; border-radius: 3px; }
@@ -199,61 +201,49 @@ body.night #tState, body.night #vState { display: none; }
 .dtc-empty svg { width: 64px; margin: 0 auto; fill: var(--green-dim); }
 .dtc-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
-.head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-.p-boost .reset { grid-column: 1; }
+.head { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 24px; }
 
 /* ---------- landscape (phone sideways in the holder): its own layout ----------
-   One merged chrome row, the main value takes the left ~70 % at full height,
-   secondary values move to a narrow ruled column on the right. */
+   One merged chrome row; the instrument takes the left part at full height and
+   the key values move to a ruled column on the right. */
 @media (orientation: landscape) {
-  .app { display: grid; grid-template: auto 1fr / 1fr auto;
+  .app { display: grid; grid-template: auto 1fr / minmax(0, 1fr) auto;
     /* keep clear of the notch / Dynamic Island and the home bar when the phone lies sideways */
     padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px);
     padding-bottom: env(safe-area-inset-bottom, 0px); box-sizing: border-box; }
-  .strip.top { grid-area: 1 / 1; }
+  .strip.top { grid-area: 1 / 1; min-width: 0; }
   .strip.bottom { grid-area: 1 / 2; border-top-width: 0; border-bottom-width: 1px; padding-left: 0; }
   .stage { grid-area: 2 / 1 / 3 / 3; }
-  .page { padding: 14px 20px; }
-  .side {
-    display: flex; flex-direction: column; justify-content: center; gap: 4cqh;
-    border-left: 1px solid var(--line); padding-left: 24px; min-width: 22cqw;
-  }
-  .side .stat b { font-size: min(11cqh, 52px); }
+  .page { padding: 12px 20px; }
 
   /* ÖVERSIKT: boost is the hero, the other three stack on the right */
   .p-main { grid-template: 1fr 1fr 1fr / 1.6fr 1fr; padding: 0; }
   .p-main .tile { border-width: 0 !important; }
   .p-main .tile[data-k="boost"] { grid-area: 1 / 1 / 4 / 2; border-right-width: 1px !important; padding: 18px 24px; }
-  .p-main .tile[data-k="boost"] .num { font-size: min(44cqw, 62cqh); }
+  .p-main .tile[data-k="boost"] .num { font-size: min(28cqw, 56cqh); }
   .p-main .tile[data-k="boost"] .scale.h { height: 20px; }
   .p-main .tile:not([data-k="boost"]) { grid-column: 2; grid-template: auto 1fr / 1fr; padding: 10px 20px; }
   .p-main .tile[data-k="rpm"], .p-main .tile[data-k="coolant"] { border-bottom-width: 1px !important; }
-  .p-main .tile:not([data-k="boost"]) .num { font-size: min(34cqw, 66cqh); }
+  .p-main .tile:not([data-k="boost"]) .num { grid-area: auto; font-size: min(34cqw, 66cqh); }
   .p-main .tile:not([data-k="boost"]) .scale { display: none; }
 
-  /* Dial pages: only the instrument, nothing else */
-  .page.has-dial { display: block; padding: 10px 16px 6px; }
-  .page.has-dial > :not(.ldial):not(.nodata):not(.cel) { display: none !important; }
-  .ldial { display: block !important; width: 100%; height: 100%; }
+  .p-dial { grid-template: minmax(0, 1fr) auto / minmax(0, 1fr) minmax(26%, auto); align-content: stretch; gap: 8px 28px; padding: 10px 20px 10px 12px; }
+  .p-dial .ldial { grid-area: 1 / 1 / 3 / 2; height: 100%; }
+  .p-dial .kv { grid-auto-flow: row; grid-auto-columns: auto; align-content: center; border-top: 0; border-left: 1px solid var(--line); padding-left: 24px; }
+  .p-dial .kv .stat { border-left: 0; padding: 10px 0; border-top: 1px solid var(--line); }
+  .p-dial .kv .stat:first-child { border-top: 0; }
+  .p-dial .kv .stat b { font-size: min(15cqh, 60px); }
+  .p-dial .reset { grid-column: 2; padding-left: 24px; }
 
-  /* LUFTMASSA: two big numbers, slim horizontal bars */
-  .p-air { grid-template-rows: auto minmax(0, 1fr) auto; gap: 8px; }
-  .p-air .head .label:first-child { display: none; }
-  .air-cols { min-height: 0; }
-  .air-col { grid-template-rows: auto minmax(0, 1fr) auto; min-height: 0; gap: 4px; }
-  .air-col .num { font-size: min(20cqw, 34cqh); align-self: center; }
-  .p-air .stats { gap: 18px; flex-wrap: nowrap; }
-  .p-air .stat { grid-auto-flow: column; align-items: baseline; gap: 8px; }
-  .p-air .stat b { font-size: min(7cqh, 26px); }
-  .air-bar { min-height: 0; height: 10px; }
-  .air-bar i { top: 0; bottom: 0; right: auto; height: auto !important; width: var(--p, 0%); }
+  .p-speed { display: block; padding: 10px 16px 6px; }
+
+  /* LUFTMASSA: requested | actual side by side */
+  .air-cols { grid-template: 1fr / 1fr 1fr; gap: 28px; }
+  .air-col { border-top: 0; padding: 0; }
+  .air-col .num { font-size: min(26cqw, 64cqh); }
+  .p-air .kv .stat { padding-top: 8px; }
+  .p-air .kv .stat b { font-size: min(9cqh, 34px); }
 }
-.ldial { display: none; overflow: visible; }
-.ldial text { font-family: var(--font); font-variant-numeric: tabular-nums; }
-.ldial text.sc { font-family: var(--scale-font); font-weight: 500; }
-.ldial .big { font-family: var(--num); font-weight: 500; }
-/* portrait-only extras hidden in landscape and vice versa */
-@media (orientation: portrait) { .side.l-only { display: none; } }
 
 /* DTC alert: takes the whole screen */
 .alert {
@@ -290,6 +280,9 @@ body.night #tState, body.night #vState { display: none; }
   background: #2a0000; color: #ffb4b4; border: 1px solid var(--red); border-radius: 4px; padding: 10px;
   font: 13px/1.4 ui-monospace, Menlo, monospace; overflow-wrap: anywhere;
 }
+/* narrow landscape (small phones, or the notch insets eating the width): the page name already says where you are */
+@media (orientation: landscape) { .dots i { width: 10px; } }
+@media (orientation: landscape) and (max-width: 760px) { .dots { display: none; } }
 @media (prefers-reduced-motion: reduce) { .app { transition: none; } }
 </style>
 
@@ -322,66 +315,60 @@ body.night #tState, body.night #vState { display: none; }
     </section>
 
     <!-- LADDTRYCK -->
-    <section class="page p-boost has-dial" data-name="Laddtryck">
-      <svg class="ldial" data-dial="boost"></svg>
-      <div class="hero">
-        <span class="label">Laddtryck</span>
-        <div class="num"><span id="bVal">--</span><span class="u">bar</span></div>
-        <div class="stats">
-          <div class="stat"><span class="label">Max</span><b id="bMax">--</b></div>
-          <div class="stat"><span class="label">IAT °C</span><b id="bIat">--</b></div>
-          <div class="stat"><span class="label">AFR</span><b id="bAfr">--</b></div>
-        </div>
+    <section class="page p-dial" data-name="Laddtryck">
+      <svg class="ldial p-only" data-dial="boost"></svg>
+      <svg class="ldial l-only" data-dial="boostL"></svg>
+      <div class="kv">
+        <div class="stat"><span class="label">Max</span><b id="bMax">--</b></div>
+        <div class="stat"><span class="label">Insug °C</span><b id="bIat">--</b></div>
+        <div class="stat"><span class="label">AFR</span><b id="bAfr">--</b></div>
       </div>
-      <div class="side l-only">
-        <div class="stat"><span class="label">Max</span><b data-dup="bMax">--</b></div>
-        <div class="stat"><span class="label">IAT °C</span><b data-dup="bIat">--</b></div>
-        <div class="stat"><span class="label">AFR</span><b data-dup="bAfr">--</b></div>
-      </div>
-      <div class="scale v" data-scale="boostTape"></div>
       <div class="reset"><button id="bReset">Nollställ max</button></div>
     </section>
 
     <!-- FART -->
-    <section class="page p-speed has-dial" data-name="Fart">
-      <svg class="ldial" data-dial="speed"></svg>
-      <div class="seg-wrap"><div class="seg" id="seg"></div><div class="seg-scale"><span>0</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span></div></div>
-      <div class="hero"><div class="num" id="sVal">--</div><span class="unit">km/h</span></div>
-      <div class="foot side">
-        <div class="stat"><span class="label">Varvtal</span><b id="sRpm">--</b></div>
+    <section class="page p-speed" data-name="Fart">
+      <svg class="ldial l-only" data-dial="speed"></svg>
+      <svg class="ldial p-only" data-dial="speedP"></svg>
+      <div class="kv p-only">
         <div class="stat"><span class="label">Laddtryck</span><b id="sBoost">--</b></div>
+        <div class="stat"><span class="label">Tank</span><b id="sFuel">--</b></div>
       </div>
     </section>
 
     <!-- MOTORTEMP -->
-    <section class="page p-gauge has-dial" data-name="Motortemp">
-      <svg class="ldial" data-dial="temp"></svg>
-      <div class="head"><span class="label">Motortemp</span><span class="label" id="tState">--</span></div>
-      <div class="hero"><div class="num"><span id="tVal">--</span><span class="u">°C</span></div></div>
-      <div class="scale h" data-scale="coolantBig"></div>
-      <div class="stats side"><div class="stat"><span class="label">Min</span><b id="tMin">--</b></div><div class="stat"><span class="label">Max</span><b id="tMax">--</b></div><div class="stat"><span class="label">Insug °C</span><b id="tIat">--</b></div></div>
+    <section class="page p-dial" data-name="Motortemp">
+      <svg class="ldial p-only" data-dial="temp"></svg>
+      <svg class="ldial l-only" data-dial="tempL"></svg>
+      <div class="kv">
+        <div class="stat"><span class="label">Min</span><b id="tMin">--</b></div>
+        <div class="stat"><span class="label">Max</span><b id="tMax">--</b></div>
+        <div class="stat"><span class="label">Insug °C</span><b id="tIat">--</b></div>
+      </div>
     </section>
 
     <!-- BATTERI -->
-    <section class="page p-gauge has-dial" data-name="Batteri">
-      <svg class="ldial" data-dial="volt"></svg>
-      <div class="head"><span class="label">Batteri</span><span class="label" id="vState">--</span></div>
-      <div class="hero"><div class="num"><span id="vVal">--</span><span class="u">V</span></div></div>
-      <div class="scale h" data-scale="battBig"></div>
-      <div class="stats side"><div class="stat"><span class="label">Min</span><b id="vMin">--</b></div><div class="stat"><span class="label">Max</span><b id="vMax">--</b></div></div>
+    <section class="page p-dial" data-name="Batteri">
+      <svg class="ldial p-only" data-dial="volt"></svg>
+      <svg class="ldial l-only" data-dial="voltL"></svg>
+      <div class="kv">
+        <div class="stat"><span class="label">Min</span><b id="vMin">--</b></div>
+        <div class="stat"><span class="label">Max</span><b id="vMax">--</b></div>
+      </div>
     </section>
 
     <!-- LUFTMASSA -->
     <section class="page p-air" data-name="Luftmassa">
-      <div class="head"><span class="label">Luftmassa</span><span class="label" id="fDev">--</span></div>
+      <div class="head"><span class="label">Luftmassa mg/c</span><span class="badge" id="fAdapt">Adapterar</span></div>
       <div class="air-cols">
-        <div class="air-col req"><span class="label">Begärd</span><div class="num"><span id="fReq">--</span><span class="u">mg/c</span></div><div class="air-bar"><i id="fReqBar"></i></div></div>
-        <div class="air-col act"><span class="label">Faktisk</span><div class="num"><span id="fAct">--</span><span class="u">mg/c</span></div><div class="air-bar"><i id="fActBar"></i></div></div>
+        <div class="air-col req"><span class="label">Begärd</span><div class="num" id="fReq">--</div><div class="air-bar"><i id="fReqBar"></i></div></div>
+        <div class="air-col act"><span class="label">Faktisk</span><div class="num" id="fAct">--</div><div class="air-bar"><i id="fActBar"></i></div></div>
       </div>
-      <div class="stats">
+      <div class="kv">
+        <div class="stat"><span class="label">Avvikelse</span><b id="fDev">--</b></div>
         <div class="stat"><span class="label">Etanol</span><b id="fEth">--</b></div>
         <div class="stat"><span class="label">Tank</span><b id="fFuel">--</b></div>
-        <span class="badge" id="fAdapt">Adapterar</span>
+        <div class="stat"><span class="label">AFR</span><b id="fAfr">--</b></div>
       </div>
     </section>
 
@@ -538,18 +525,13 @@ const scaleDefs = {
   rpm:        { lo: 0, hi: 8000, step: 1000, major: 2000 },
   coolant:    { lo: 40, hi: 130, step: 10, major: 30 },
   batt:       { lo: 8, hi: 16, step: 1, major: 2 },
-  boostTape:  { lo: -1, hi: 2, step: .1, major: .5, peak: true, zones: [[-1, 0, 'var(--vac)'], [1.6, 2, 'var(--red)']] },
-  coolantBig: { lo: 40, hi: 130, step: 5, major: 10, zones: [[80, 105, 'var(--green-dim)'], [105, 115, 'var(--amber)'], [115, 130, 'var(--red)']] },
-  battBig:    { lo: 8, hi: 16, step: .5, major: 1, zones: [[8, 11.8, 'var(--red)'], [13.2, 14.8, 'var(--green-dim)'], [15.2, 16, 'var(--amber)']] },
 };
 document.querySelectorAll('[data-scale]').forEach(h => { sc[h.dataset.scale] = makeScale(h, scaleDefs[h.dataset.scale]); });
 document.querySelectorAll('.tile').forEach(t => { tiles[t.dataset.k] = t.querySelector('[data-v]'); });
-const SEGS = 40, seg = $('seg');
-for (let i = 0; i < SEGS; i++) { const s = document.createElement('i'); const r = (i + 1) / SEGS * 8000; if (r > 6000) s.className = 'r'; else if (r > 5000) s.className = 'a'; seg.appendChild(s); }
 pages.forEach(() => $('dots').appendChild(document.createElement('i')));
 
 
-/* ================= Landscape instruments (SVG dials) ================= */
+/* ================= Round instruments (SVG dials) ================= */
 const SVGNS = 'http://www.w3.org/2000/svg';
 const sv = (tag, at, parent) => { const e = document.createElementNS(SVGNS, tag); for (const k in at) e.setAttribute(k, at[k]); if (parent) parent.appendChild(e); return e; };
 const P = (cx, cy, r, deg) => [cx + r * Math.cos(deg * Math.PI / 180), cy + r * Math.sin(deg * Math.PI / 180)];
@@ -581,6 +563,7 @@ function makeDial(svg, o) {
     }
   }
   const band = mode === 'arc' ? sv('path', { stroke: 'var(--green)', 'stroke-width': o.w || 10, fill: 'none' }, g) : null;
+  const pk = o.peak ? sv('line', { stroke: 'var(--amber)', 'stroke-width': 3 }, g) : null;
   let needle = null;
   if (mode === 'needle') {
     needle = sv('g', {}, g);
@@ -594,6 +577,14 @@ function makeDial(svg, o) {
       const has = v != null;
       if (band) { band.setAttribute('d', has ? arcPath(cx, cy, r, Math.min(ang(base), ang(v)), Math.max(ang(base), ang(v))) : ''); band.setAttribute('stroke', color || 'var(--green)'); }
       if (needle) { needle.style.display = has ? '' : 'none'; if (has) needle.setAttribute('transform', `rotate(${ang(v).toFixed(2)} ${cx} ${cy})`); }
+    },
+    // session max: a short amber tick across the band
+    peak(v) {
+      if (!pk) return;
+      pk.style.display = v == null ? 'none' : '';
+      if (v == null) return;
+      const w = o.w || 10, [x0, y0] = P(cx, cy, r - w / 2 - 3, ang(v)), [x1, y1] = P(cx, cy, r + w / 2 + 3, ang(v));
+      pk.setAttribute('x1', x0); pk.setAttribute('y1', y0); pk.setAttribute('x2', x1); pk.setAttribute('y2', y1);
     },
   };
 }
@@ -610,39 +601,111 @@ function placeUnit(text) {
   const w = text.getComputedTextLength();
   if (Math.abs(w - text._w) > 0.5) { text._w = w; text._unit.setAttribute('x', (text._cx + w / 2 + 6).toFixed(1)); }
 }
+/* FART: needle instruments in the spirit of the 9-3 NG cluster: chrome bezel, anthracite face,
+   thick white major bars, silver tapered needle and hub. ang maps a value to degrees
+   (clockwise from 3 o'clock); ticks is a list of [value, major, label]. */
+function ngDial(svg, id, o) {
+  const { cx, cy, R, ang } = o;
+  let defs = svg.querySelector('defs');
+  if (!defs) {
+    defs = sv('defs', {}, svg);
+    const bz = sv('linearGradient', { id: id + 'bz', x1: 0, y1: 0, x2: 0, y2: 1 }, defs);
+    [['0', '#e4e6e5'], ['.5', '#5d605e'], ['1', '#c9cbca']].forEach(([of, c]) => sv('stop', { offset: of, 'stop-color': c }, bz));
+    const fc = sv('radialGradient', { id: id + 'fc', cx: .5, cy: .45, r: .6 }, defs);
+    [['0', '#1c1f1d'], ['1', '#0a0b0a']].forEach(([of, c]) => sv('stop', { offset: of, 'stop-color': c }, fc));
+  }
+  const g = sv('g', {}, svg);
+  sv('circle', { cx, cy, r: R, fill: `url(#${id}fc)`, stroke: `url(#${id}bz)`, 'stroke-width': 5, class: 'bezel' }, g);
+  const rt = R - 9;
+  for (const [z0, z1, c] of o.zones || []) sv('path', { d: arcPath(cx, cy, rt - 18, ang(z0), ang(z1)), stroke: c, 'stroke-width': 4, fill: 'none' }, g);
+  for (const [v, major, label] of o.ticks) {
+    const a = ang(v), [x0, y0] = P(cx, cy, rt, a), [x1, y1] = P(cx, cy, rt - (major ? 14 : 7), a);
+    sv('line', { x1: x0, y1: y0, x2: x1, y2: y1, stroke: major ? '#eef0ef' : '#8c918e', 'stroke-width': major ? 4 : 1.6, class: major ? '' : 'minor' }, g);
+    if (label != null) {
+      const ls = typeof o.lsize === 'function' ? o.lsize(v) : o.lsize, [lx, ly] = P(cx, cy, rt - 14 - ls * 0.95, a);
+      const t = sv('text', { x: lx, y: ly, 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-size': ls, fill: '#dfe2e0', class: 'sc' }, g);
+      t.textContent = label;
+    }
+  }
+  const txt = (y, size, fill, cls) => sv('text', { x: cx, y, 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-size': size, fill, class: cls || '' }, g);
+  const pk = o.peak ? sv('line', { stroke: 'var(--amber)', 'stroke-width': 4 }, g) : null;
+  const extra = sv('g', {}, g); // readouts sit under the needle
+  const needle = sv('g', {}, g), L = rt - 6, w = Math.max(3, R * 0.035);
+  sv('path', { d: `M${cx - R * 0.16} ${cy - w}L${cx + L} ${cy - 0.8}L${cx + L} ${cy + 0.8}L${cx - R * 0.16} ${cy + w}Z`, fill: '#e9ebea' }, needle);
+  sv('circle', { cx, cy, r: R * 0.11, fill: `url(#${id}bz)`, class: 'bezel' }, g);
+  sv('circle', { cx, cy, r: R * 0.055, fill: '#2b2e2c' }, g);
+  return {
+    g, txt, extra,
+    set(v) { needle.style.display = v == null ? 'none' : ''; if (v != null) needle.setAttribute('transform', `rotate(${ang(v).toFixed(2)} ${cx} ${cy})`); },
+    // session max: a short amber mark just inside the ticks
+    peak(v) {
+      if (!pk) return;
+      pk.style.display = v == null ? 'none' : '';
+      if (v == null) return;
+      const [x0, y0] = P(cx, cy, rt + 2, ang(v)), [x1, y1] = P(cx, cy, rt - 16, ang(v));
+      pk.setAttribute('x1', x0); pk.setAttribute('y1', y0); pk.setAttribute('x2', x1); pk.setAttribute('y2', y1);
+    },
+  };
+}
+// digital readout under the hub: same placement, colour and proportion on every needle dial
+function readout(d, c, R, unit) {
+  d.val = d.txt(c.cy + R * 0.45, R * 0.2, 'var(--cap)', 'big'); d.extra.appendChild(d.val);
+  const u = d.txt(c.cy + R * 0.62, R * 0.075, '#9a9f9c'); u.textContent = unit; d.extra.appendChild(u);
+}
+const span = (lo, hi, step, f) => { const out = []; for (let v = lo; v <= hi + 1e-9; v += step) out.push(f(+v.toFixed(3))); return out; };
+// speedometer: 0–140 gets most of the sweep, 140–260 is compressed with smaller numbers, as in the 9-3 NG
+const kmhAng = v => { v = Math.max(0, Math.min(260, v)); return v <= 140 ? 172 + v / 140 * 128 : 300 + (v - 140) / 120 * 82; };
+function cluster(s, id, k, t, c) {
+  const kmh = ngDial(s, id, { ...k, ang: kmhAng, lsize: v => v <= 140 ? k.R * 0.105 : k.R * 0.08,
+    ticks: [...span(0, 140, 10, v => [v, v % 20 === 0, v % 20 === 0 && v > 0 ? v : null]), ...span(150, 260, 10, v => [v, v % 20 === 0, v % 20 === 0 ? v : null])] });
+  readout(kmh, k, k.R, 'km/h');
+  const rpm = ngDial(s, id, { ...t, ang: v => 140 + 260 * clamp01(v / 8), lsize: t.R * 0.17, zones: [[6, 8, 'var(--red)']],
+    ticks: span(0, 8, 0.5, v => [v, v % 1 === 0, v % 1 === 0 ? v : null]) });
+  readout(rpm, t, t.R, 'varv/min');
+  const ru = rpm.txt(t.cy - t.R * 0.36, t.R * 0.085, '#9a9f9c'); ru.textContent = 'x 1000'; rpm.extra.appendChild(ru);
+  rpm.g.classList.add('tach');
+  // 50–130 so that normal (90) sits straight up
+  const temp = ngDial(s, id, { ...c, ang: v => 150 + 240 * clamp01((v - 50) / 80), lsize: c.R * 0.15, zones: [[115, 130, 'var(--red)']],
+    ticks: span(50, 130, 10, v => [v, v % 40 === 10, v % 40 === 10 ? v : null]) });
+  readout(temp, c, c.R, '°C');
+  temp.g.classList.add('tach');
+  return { rpm, kmh, temp };
+}
 function buildDials() {
   const q = k => document.querySelector(`[data-dial="${k}"]`);
-  // LADDTRYCK
-  let s = q('boost'); s.setAttribute('viewBox', '0 0 440 330');
-  dials.boost = makeDial(s, { cx: 220, cy: 182, r: 132, lo: -1, hi: 2, base: 0, minor: 0.1, major: 0.5, w: 12,
-    zones: [[-1, 0, 'var(--vac)'], [1.6, 2, 'var(--red)']], label: v => Math.abs(v - Math.round(v)) < 1e-6 ? (v > 0 ? '+' : '') + Math.round(v) : '' });
-  dials.boost.val = withUnit(dials.boost.txt(176, 90, 'var(--green)', 'big'), 'bar');
-  dials.boost.txt(238, 16, 'var(--dim)').textContent = 'LADDTRYCK';
-  dials.boost.sub = dials.boost.txt(312, 16, 'var(--dim)', 'sub');
-  // MOTORTEMP
-  s = q('temp'); s.setAttribute('viewBox', '0 0 440 330');
-  dials.temp = makeDial(s, { cx: 220, cy: 182, r: 132, lo: 40, hi: 130, minor: 5, major: 30, w: 12,
-    zones: [[80, 105, 'var(--green-dim)'], [105, 115, 'var(--amber)'], [115, 130, 'var(--red)']] });
-  dials.temp.val = withUnit(dials.temp.txt(176, 96, 'var(--green)', 'big'), '°C');
-  dials.temp.txt(238, 16, 'var(--dim)').textContent = 'MOTORTEMP';
-  dials.temp.sub = dials.temp.txt(312, 16, 'var(--dim)', 'sub');
-  // BATTERI
-  s = q('volt'); s.setAttribute('viewBox', '0 0 440 330');
-  dials.volt = makeDial(s, { cx: 220, cy: 182, r: 132, lo: 8, hi: 16, minor: 0.5, major: 2, w: 12,
-    zones: [[8, 11.8, 'var(--red)'], [13.2, 14.8, 'var(--green-dim)'], [15.2, 16, 'var(--amber)']] });
-  dials.volt.val = withUnit(dials.volt.txt(176, 92, 'var(--green)', 'big'), 'V');
-  dials.volt.txt(238, 16, 'var(--dim)').textContent = 'BATTERI';
-  dials.volt.sub = dials.volt.txt(312, 16, 'var(--dim)', 'sub');
-  // FART: classic twin cluster, tach left, speedo right
-  s = q('speed'); s.setAttribute('viewBox', '0 0 860 340');
-  dials.rpm = makeDial(s, { cx: 205, cy: 180, r: 160, lo: 0, hi: 8, minor: 0.1, mid: 0.5, major: 1, lcolor: 'var(--cap)', mode: 'needle', w: 6, lsize: 22, zones: [[6, 8, 'var(--red)']] });
-  dials.rpm.val = dials.rpm.txt(262, 44, 'var(--cap)', 'big');
-  dials.rpm.txt(300, 14, 'var(--dim)').textContent = 'VARV/MIN';
-  dials.rpm.txt(120, 14, 'var(--dim)').textContent = '×1000';
-  dials.rpm.g.classList.add('tach');
-  dials.kmh = makeDial(s, { cx: 655, cy: 180, r: 160, lo: 0, hi: 260, minor: 5, mid: 10, major: 20, mode: 'needle', w: 6, lsize: 19, lcolor: 'var(--cap)' });
-  dials.kmh.val = dials.kmh.txt(256, 68, 'var(--green)', 'big');
-  dials.kmh.txt(300, 14, 'var(--dim)').textContent = 'KM/H';
+  const gauge = (k, o, size, unit, name) => {
+    const s = q(k); s.setAttribute('viewBox', '44 4 352 294');
+    const d = makeDial(s, { cx: 220, cy: 182, r: 132, minor: 5, w: 12, ...o });
+    d.val = withUnit(d.txt(176, size, 'var(--green)', 'big'), unit);
+    d.txt(238, 16, 'var(--dim)').textContent = name;
+    d.sub = d.txt(284, 16, 'var(--dim)', 'sub');
+    return d;
+  };
+  dials.boost = gauge('boost', { lo: -1, hi: 2, base: 0, minor: 0.1, major: 0.5, peak: true,
+    zones: [[-1, 0, 'var(--vac)'], [1.6, 2, 'var(--red)']], label: v => Math.abs(v - Math.round(v)) < 1e-6 ? (v > 0 ? '+' : '') + Math.round(v) : '' }, 72, 'bar', 'LADDTRYCK');
+  dials.temp = gauge('temp', { lo: 40, hi: 130, minor: 5, major: 30,
+    zones: [[80, 105, 'var(--green-dim)'], [105, 115, 'var(--amber)'], [115, 130, 'var(--red)']] }, 84, '°C', 'MOTORTEMP');
+  dials.volt = gauge('volt', { lo: 8, hi: 16, minor: 0.5, major: 2,
+    zones: [[8, 11.8, 'var(--red)'], [13.2, 14.8, 'var(--green-dim)'], [15.2, 16, 'var(--amber)']] }, 76, 'V', 'BATTERI');
+  // landscape: the same three instruments in the chrome cluster style
+  const chrome = (k, o, unit, name) => {
+    const s = q(k), c = { cx: 160, cy: 160, R: 152 }; s.setAttribute('viewBox', '0 0 320 320');
+    const d = ngDial(s, k, { ...c, lsize: c.R * 0.13, ...o });
+    readout(d, c, c.R, unit);
+    const n = d.txt(c.cy - c.R * 0.36, c.R * 0.075, '#9a9f9c'); n.textContent = name; d.extra.appendChild(n);
+    d.sub = d.txt(c.cy + c.R * 0.8, c.R * 0.075, 'var(--dim)', 'sub'); d.extra.appendChild(d.sub);
+    return d;
+  };
+  dials.boostL = chrome('boostL', { ang: v => 150 + 240 * clamp01((v + 1) / 3), peak: true, zones: [[-1, 0, 'var(--vac)'], [1.6, 2, 'var(--red)']],
+    ticks: span(-1, 2, 0.1, v => [v, Math.abs(v * 2 - Math.round(v * 2)) < 1e-6, Math.abs(v - Math.round(v)) < 1e-6 ? (v > 0 ? '+' : '') + Math.round(v) : null]) }, 'bar', 'LADDTRYCK');
+  dials.tempL = chrome('tempL', { ang: v => 150 + 240 * clamp01((v - 50) / 80), zones: [[105, 115, 'var(--amber)'], [115, 130, 'var(--red)']],
+    ticks: span(50, 130, 5, v => [v, v % 10 === 0, v % 20 === 10 ? v : null]) }, '°C', 'MOTORTEMP');
+  dials.voltL = chrome('voltL', { ang: v => 150 + 240 * clamp01((v - 8) / 8), zones: [[8, 11.8, 'var(--red)'], [15.2, 16, 'var(--amber)']],
+    ticks: span(8, 16, 0.5, v => [v, v % 1 === 0, v % 2 === 0 ? v : null]) }, 'V', 'BATTERI');
+  let s = q('speed'); s.setAttribute('viewBox', '0 0 860 350');
+  dials.speed = cluster(s, 'cl', { cx: 430, cy: 175, R: 168 }, { cx: 140, cy: 222, R: 112 }, { cx: 720, cy: 222, R: 112 });
+  s = q('speedP'); s.setAttribute('viewBox', '0 0 410 640');
+  dials.speedP = cluster(s, 'cp', { cx: 205, cy: 192, R: 190 }, { cx: 103, cy: 530, R: 98 }, { cx: 307, cy: 530, R: 98 });
 }
 buildDials();
 
@@ -678,49 +741,46 @@ function render() {
   set(tiles.batt, L(d.batt, 1)); cls(tiles.batt, live && vC(d.batt)); sc.batt.set(live ? d.batt : null, col(live && vC(d.batt)));
 
   // LADDTRYCK
-  set($('bVal'), L(d.boost, 2)); cls($('bVal'), live && bC(d.boost));
-  sc.boostTape.set(live ? disp.boost : null, col(live && bC(d.boost))); sc.boostTape.peak(sess.bMax);
+  dials.boost.set(live ? disp.boost : null, col(live && bC(d.boost))); dials.boost.peak(sess.bMax);
+  set(dials.boost.val, L(d.boost, 2)); placeUnit(dials.boost.val); dials.boost.val.setAttribute('fill', col(live && bC(d.boost)));
+  dials.boostL.set(live ? disp.boost : null); dials.boostL.peak(sess.bMax); set(dials.boostL.val, L(d.boost, 2));
+  dials.boostL.val.setAttribute('fill', live && bC(d.boost) ? col(bC(d.boost)) : 'var(--cap)');
   set($('bMax'), fmt(sess.bMax, 2)); set($('bIat'), L(d.iat, 0)); set($('bAfr'), L(d.afr, 1));
-  document.querySelectorAll('[data-dup]').forEach(n => set(n, $(n.dataset.dup).textContent));
 
   // FART
-  set($('sVal'), L(d.speed, 0)); set($('sRpm'), L(d.rpm, 0)); set($('sBoost'), L(d.boost, 2));
-  const lit = live ? Math.round(disp.rpm / 8000 * SEGS) : 0;
-  seg.parentElement.classList.toggle('hot', live && d.rpm >= 5000);
-  for (let i = 0; i < SEGS; i++) seg.children[i].classList.toggle('on', i < lit);
+  for (const c of [dials.speed, dials.speedP]) {
+    c.rpm.set(live ? disp.rpm / 1000 : null); set(c.rpm.val, L(d.rpm, 0));
+    c.kmh.set(live ? disp.speed : null); set(c.kmh.val, L(d.speed, 0));
+    c.temp.set(live ? d.coolant : null); set(c.temp.val, L(d.coolant, 0)); c.temp.val.setAttribute('fill', live && tC(d.coolant) ? col(tC(d.coolant)) : 'var(--cap)'); // only warnings get colour
+  }
+  set($('sBoost'), L(d.boost, 2)); cls($('sBoost'), live && bC(d.boost));
+  set($('sFuel'), live && d.fuel != null ? d.fuel + ' %' : '--');
 
   // MOTORTEMP / BATTERI
-  set($('tVal'), L(d.coolant, 0)); cls($('tVal'), live && tC(d.coolant)); sc.coolantBig.set(live ? d.coolant : null, col(live && tC(d.coolant)));
+  dials.temp.set(live ? d.coolant : null, col(live && tC(d.coolant)));
+  set(dials.temp.val, L(d.coolant, 0)); placeUnit(dials.temp.val); dials.temp.val.setAttribute('fill', col(live && tC(d.coolant)));
+  set(dials.temp.sub, !live ? '' : d.coolant < 70 ? 'KALL MOTOR' : tC(d.coolant) === 'crit' ? 'FÖR VARM' : tC(d.coolant) ? 'VARM' : 'NORMAL');
+  dials.tempL.set(live ? d.coolant : null); set(dials.tempL.val, L(d.coolant, 0)); set(dials.tempL.sub, dials.temp.sub.textContent);
+  dials.tempL.val.setAttribute('fill', live && tC(d.coolant) ? col(tC(d.coolant)) : 'var(--cap)');
   set($('tMin'), fmt(sess.tMin, 0)); set($('tMax'), fmt(sess.tMax, 0)); set($('tIat'), L(d.iat, 0));
-  set($('tState'), !live ? '--' : d.coolant < 70 ? 'Kall motor' : tC(d.coolant) === 'crit' ? 'För varm' : tC(d.coolant) ? 'Varm' : 'Normal');
-  set($('vVal'), L(d.batt, 1)); cls($('vVal'), live && vC(d.batt)); sc.battBig.set(live ? d.batt : null, col(live && vC(d.batt)));
+  dials.volt.set(live ? d.batt : null, col(live && vC(d.batt)));
+  set(dials.volt.val, L(d.batt, 1)); placeUnit(dials.volt.val); dials.volt.val.setAttribute('fill', col(live && vC(d.batt)));
+  set(dials.volt.sub, !live ? '' : d.batt < 11.8 ? 'LÅG SPÄNNING' : d.batt > 15.2 ? 'HÖG SPÄNNING' : d.batt >= 13.2 ? 'LADDAR' : 'LADDAR EJ');
+  dials.voltL.set(live ? d.batt : null); set(dials.voltL.val, L(d.batt, 1)); set(dials.voltL.sub, dials.volt.sub.textContent);
+  dials.voltL.val.setAttribute('fill', live && vC(d.batt) ? col(vC(d.batt)) : 'var(--cap)');
   set($('vMin'), fmt(sess.vMin, 1)); set($('vMax'), fmt(sess.vMax, 1));
-  set($('vState'), !live ? '--' : d.batt < 11.8 ? 'Låg spänning' : d.batt > 15.2 ? 'Hög spänning' : d.batt >= 13.2 ? 'Laddar' : 'Laddar ej');
 
   // LUFTMASSA
   set($('fReq'), L(d.airmReq, 0)); set($('fAct'), L(d.airmAct, 0));
   $('fReqBar').style.setProperty('--p', (live && d.airmReq != null ? clamp01(d.airmReq / 1400) * 100 : 0) + '%');
   $('fActBar').style.setProperty('--p', (live && d.airmAct != null ? clamp01(d.airmAct / 1400) * 100 : 0) + '%');
   const dev = live && d.airmReq && d.airmAct != null ? (d.airmAct - d.airmReq) / d.airmReq * 100 : null;
-  set($('fDev'), dev == null ? '--' : `Avvikelse ${dev > 0 ? '+' : ''}${dev.toFixed(0)} %`);
+  set($('fDev'), dev == null ? '--' : `${dev > 0 ? '+' : ''}${dev.toFixed(0)} %`);
+  cls($('fDev'), dev != null && Math.abs(dev) >= 15 ? 'warn' : '');
   set($('fEth'), live && d.ethanol != null ? d.ethanol + ' %' : '--');
   set($('fFuel'), live && d.fuel != null ? d.fuel + ' %' : '--');
+  set($('fAfr'), L(d.afr, 1));
   $('fAdapt').hidden = !(live && d.adapt);
-
-  // landscape dials
-  if (matchMedia('(orientation: landscape)').matches) {
-    dials.boost.set(live ? disp.boost : null, col(live && bC(d.boost))); set(dials.boost.val, L(d.boost, 2)); placeUnit(dials.boost.val);
-    dials.boost.val.setAttribute('fill', col(live && bC(d.boost)));
-    set(dials.boost.sub, `MAX ${fmt(sess.bMax, 2)}   ·   IAT ${L(d.iat, 0)}°   ·   AFR ${L(d.afr, 1)}`);
-    dials.temp.set(live ? d.coolant : null, col(live && tC(d.coolant))); set(dials.temp.val, L(d.coolant, 0)); placeUnit(dials.temp.val);
-    dials.temp.val.setAttribute('fill', col(live && tC(d.coolant)));
-    set(dials.temp.sub, $('tState').textContent.toUpperCase());
-    dials.volt.set(live ? d.batt : null, col(live && vC(d.batt))); set(dials.volt.val, L(d.batt, 1)); placeUnit(dials.volt.val);
-    dials.volt.val.setAttribute('fill', col(live && vC(d.batt)));
-    set(dials.volt.sub, $('vState').textContent.toUpperCase());
-    dials.rpm.set(live ? disp.rpm / 1000 : null); set(dials.rpm.val, L(d.rpm, 0));
-    dials.kmh.set(live ? disp.speed : null); set(dials.kmh.val, L(d.speed, 0));
-  }
 
   requestAnimationFrame(render);
 }
@@ -958,10 +1018,11 @@ btnDemo.onclick = () => {
 };
 
 /* ================= Night + log sheet ================= */
-const btnNight = $('btnNight'), speedSvg = document.querySelector('[data-dial="speed"]');
+const btnNight = $('btnNight'), speedSvg = document.querySelector('[data-dial="speed"]'), speedPSvg = document.querySelector('[data-dial="speedP"]');
 function setNight(on) {
   document.body.classList.toggle('night', on); btnNight.setAttribute('aria-pressed', String(on));
-  speedSvg.setAttribute('viewBox', on ? '450 0 410 340' : '0 0 860 340'); // night: speedometer only
+  speedSvg.setAttribute('viewBox', on ? '254 0 352 352' : '0 0 860 350'); // night: speedometer only
+  speedPSvg.setAttribute('viewBox', on ? '10 0 390 390' : '0 0 410 640');
   requestAnimationFrame(() => { slidesEl.scrollLeft = state.slide * slidesEl.clientWidth; });
   try { localStorage.setItem('saab.night', on ? '1' : ''); } catch (e) {}
 }
