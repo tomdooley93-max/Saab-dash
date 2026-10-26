@@ -15,7 +15,7 @@
 <body>
 <title>Saab Dash</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@300;500&family=Barlow+Semi+Condensed:wght@400;500;600&family=Saira+Semi+Condensed:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600&family=Saira:wght@400;500&display=swap">
 <style>
 /* Layout: full-bleed instrument pages swiped sideways. Each page is a size container; numbers scale with
    min(cqw,cqh) so the same page works upright and sideways in a phone holder. Saab night-panel palette:
@@ -34,8 +34,9 @@
   --cap: #c8c8c8;
   --dim: #7d857f;
   --tick: #3c443e;
-  --num: "Barlow Condensed", "Arial Narrow", "Helvetica Neue", system-ui, sans-serif;
-  --scale-font: "Saira Semi Condensed", "Barlow Semi Condensed", "Arial Narrow", sans-serif;
+  /* wide, softly squared numerals in the spirit of Saab clusters (not the narrow DIN look) */
+  --num: "Saira", "Helvetica Neue", system-ui, sans-serif;
+  --scale-font: "Saira", "Barlow Semi Condensed", sans-serif;
   --font: "Barlow Semi Condensed", "Arial Narrow", "Helvetica Neue", system-ui, sans-serif;
   color-scheme: dark;
 }
@@ -233,7 +234,7 @@ body.night.cel .cel-night { display: block; }
   .p-main { grid-template: 1fr 1fr 1fr / 1.6fr 1fr; padding: 0; }
   .p-main .tile { border-width: 0 !important; }
   .p-main .tile[data-k="boost"] { grid-area: 1 / 1 / 4 / 2; border-right-width: 1px !important; padding: 18px 24px; }
-  .p-main .tile[data-k="boost"] .num { font-size: min(44cqw, 62cqh); }
+  .p-main .tile[data-k="boost"] .num { font-size: min(28cqw, 56cqh); }
   .p-main .tile[data-k="boost"] .scale.h { height: 20px; }
   .p-main .tile:not([data-k="boost"]) { grid-column: 2; grid-template: auto 1fr / 1fr; padding: 10px 20px; }
   .p-main .tile[data-k="rpm"], .p-main .tile[data-k="coolant"] { border-bottom-width: 1px !important; }
@@ -454,7 +455,7 @@ window.addEventListener('unhandledrejection', showScriptError);
    injects into the page (a clash stops the whole app from running). */
 (function () {
 'use strict';
-const BUILD = '20261026-0850';
+const BUILD = '20261026-0903';
 document.getElementById('chipTxt').textContent = 'Skript steg 1';
 /* ================= Protocol v2, Wi-Fi + WebSocket (see PROTOCOL.md) ================= */
 const MSG = { DATA: 0x01, DTC: 0x02, LOG: 0x03 };
@@ -613,13 +614,13 @@ function placeUnit(text) {
 }
 // FART: classic twin cluster, tach + speedometer (side by side in landscape, stacked upright)
 function cluster(s, [tx, ty], [kx, ky]) {
-  const rpm = makeDial(s, { cx: tx, cy: ty, r: 160, lo: 0, hi: 8, minor: 0.1, mid: 0.5, major: 1, lcolor: 'var(--cap)', mode: 'needle', w: 6, lsize: 22, zones: [[6, 8, 'var(--red)']] });
-  rpm.val = rpm.txt(ty + 82, 44, 'var(--cap)', 'big');
+  const rpm = makeDial(s, { cx: tx, cy: ty, r: 160, lo: 0, hi: 8, minor: 0.1, mid: 0.5, major: 1, lcolor: 'var(--cap)', mode: 'needle', w: 6, lsize: 20, zones: [[6, 8, 'var(--red)']] });
+  rpm.val = rpm.txt(ty + 82, 40, 'var(--cap)', 'big');
   rpm.txt(ty + 120, 14, 'var(--dim)').textContent = 'VARV/MIN';
   rpm.txt(ty - 60, 14, 'var(--dim)').textContent = '×1000';
   rpm.g.classList.add('tach');
-  const kmh = makeDial(s, { cx: kx, cy: ky, r: 160, lo: 0, hi: 260, minor: 5, mid: 10, major: 20, mode: 'needle', w: 6, lsize: 19, lcolor: 'var(--cap)' });
-  kmh.val = kmh.txt(ky + 76, 68, 'var(--green)', 'big');
+  const kmh = makeDial(s, { cx: kx, cy: ky, r: 160, lo: 0, hi: 260, minor: 5, mid: 10, major: 20, mode: 'needle', w: 6, lsize: 16, lcolor: 'var(--cap)' });
+  kmh.val = kmh.txt(ky + 76, 60, 'var(--green)', 'big');
   kmh.txt(ky + 120, 14, 'var(--dim)').textContent = 'KM/H';
   return { rpm, kmh };
 }
@@ -634,11 +635,11 @@ function buildDials() {
     return d;
   };
   dials.boost = gauge('boost', { lo: -1, hi: 2, base: 0, minor: 0.1, major: 0.5, peak: true,
-    zones: [[-1, 0, 'var(--vac)'], [1.6, 2, 'var(--red)']], label: v => Math.abs(v - Math.round(v)) < 1e-6 ? (v > 0 ? '+' : '') + Math.round(v) : '' }, 90, 'bar', 'LADDTRYCK');
+    zones: [[-1, 0, 'var(--vac)'], [1.6, 2, 'var(--red)']], label: v => Math.abs(v - Math.round(v)) < 1e-6 ? (v > 0 ? '+' : '') + Math.round(v) : '' }, 72, 'bar', 'LADDTRYCK');
   dials.temp = gauge('temp', { lo: 40, hi: 130, minor: 5, major: 30,
-    zones: [[80, 105, 'var(--green-dim)'], [105, 115, 'var(--amber)'], [115, 130, 'var(--red)']] }, 96, '°C', 'MOTORTEMP');
+    zones: [[80, 105, 'var(--green-dim)'], [105, 115, 'var(--amber)'], [115, 130, 'var(--red)']] }, 84, '°C', 'MOTORTEMP');
   dials.volt = gauge('volt', { lo: 8, hi: 16, minor: 0.5, major: 2,
-    zones: [[8, 11.8, 'var(--red)'], [13.2, 14.8, 'var(--green-dim)'], [15.2, 16, 'var(--amber)']] }, 92, 'V', 'BATTERI');
+    zones: [[8, 11.8, 'var(--red)'], [13.2, 14.8, 'var(--green-dim)'], [15.2, 16, 'var(--amber)']] }, 76, 'V', 'BATTERI');
   let s = q('speed'); s.setAttribute('viewBox', '0 0 860 340');
   dials.speed = cluster(s, [205, 180], [655, 180]);
   s = q('speedP'); s.setAttribute('viewBox', '30 0 350 640');
