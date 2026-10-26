@@ -26,7 +26,7 @@
   color-scheme: dark;
 }
 [hidden] { display: none !important; }
-html, body { height: 100%; }
+html, body { height: var(--app-h, 100%); }
 body {
   background: var(--bg); color: var(--cap); font-family: var(--font); margin: 0; overflow: hidden;
   -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
@@ -438,6 +438,19 @@ window.addEventListener('unhandledrejection', showScriptError);
    injects into the page (a clash stops the whole app from running). */
 (function () {
 'use strict';
+// iOS home-screen mode with the translucent status bar: the viewport can end a status bar's
+// height short of the screen, leaving a dead band under the bottom strip. The app owns the
+// whole screen there, so size it to the screen (screen.* does not rotate, hence min/max).
+function fitStandalone() {
+  if (!navigator.standalone) return;
+  const land = matchMedia('(orientation: landscape)').matches;
+  const h = land ? Math.min(screen.width, screen.height) : Math.max(screen.width, screen.height);
+  document.documentElement.style.setProperty('--app-h', h + 'px');
+}
+fitStandalone();
+addEventListener('resize', fitStandalone);
+addEventListener('orientationchange', fitStandalone);
+
 const BUILD = 'BUILD_STAMP';
 document.getElementById('chipTxt').textContent = 'Skript steg 1';
 /* ================= Protocol v2, Wi-Fi + WebSocket (see PROTOCOL.md) ================= */
