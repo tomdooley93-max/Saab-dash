@@ -57,6 +57,7 @@ body.night .air-col.req .num, body.night .air-col.req .label { color: #8a4400; }
 body.night .p-air .badge { visibility: hidden; }
 body.night .p-dial { grid-template-columns: minmax(0, 1fr); }
 body.night .ldial .minor, body.night .ldial .sub, body.night .ldial .tach { display: none; }
+body.night .ldial .bezel { opacity: .35; }
 
 
 /* ---------- chrome: one slim strip on top, one at the bottom ---------- */
@@ -330,7 +331,7 @@ body.night.cel .cel-night { display: block; }
       <svg class="ldial p-only" data-dial="speedP"></svg>
       <div class="kv p-only">
         <div class="stat"><span class="label">Laddtryck</span><b id="sBoost">--</b></div>
-        <div class="stat"><span class="label">Motortemp</span><b id="sTemp">--</b></div>
+        <div class="stat"><span class="label">Tank</span><b id="sFuel">--</b></div>
       </div>
     </section>
 
@@ -597,17 +598,64 @@ function placeUnit(text) {
   const w = text.getComputedTextLength();
   if (Math.abs(w - text._w) > 0.5) { text._w = w; text._unit.setAttribute('x', (text._cx + w / 2 + 6).toFixed(1)); }
 }
-// FART: classic twin cluster, tach + speedometer (side by side in landscape, stacked upright)
-function cluster(s, [tx, ty], [kx, ky]) {
-  const rpm = makeDial(s, { cx: tx, cy: ty, r: 160, lo: 0, hi: 8, minor: 0.1, mid: 0.5, major: 1, lcolor: 'var(--cap)', mode: 'needle', w: 6, lsize: 20, zones: [[6, 8, 'var(--red)']] });
-  rpm.val = rpm.txt(ty + 82, 40, 'var(--cap)', 'big');
-  rpm.txt(ty + 120, 14, 'var(--dim)').textContent = 'VARV/MIN';
-  rpm.txt(ty - 60, 14, 'var(--dim)').textContent = '×1000';
+/* FART: needle instruments in the spirit of the 9-3 NG cluster: chrome bezel, anthracite face,
+   thick white major bars, silver tapered needle and hub. ang maps a value to degrees
+   (clockwise from 3 o'clock); ticks is a list of [value, major, label]. */
+function ngDial(svg, id, o) {
+  const { cx, cy, R, ang } = o;
+  let defs = svg.querySelector('defs');
+  if (!defs) {
+    defs = sv('defs', {}, svg);
+    const bz = sv('linearGradient', { id: id + 'bz', x1: 0, y1: 0, x2: 0, y2: 1 }, defs);
+    [['0', '#e4e6e5'], ['.5', '#5d605e'], ['1', '#c9cbca']].forEach(([of, c]) => sv('stop', { offset: of, 'stop-color': c }, bz));
+    const fc = sv('radialGradient', { id: id + 'fc', cx: .5, cy: .45, r: .6 }, defs);
+    [['0', '#1c1f1d'], ['1', '#0a0b0a']].forEach(([of, c]) => sv('stop', { offset: of, 'stop-color': c }, fc));
+  }
+  const g = sv('g', {}, svg);
+  sv('circle', { cx, cy, r: R, fill: `url(#${id}fc)`, stroke: `url(#${id}bz)`, 'stroke-width': 5, class: 'bezel' }, g);
+  const rt = R - 9;
+  for (const [z0, z1, c] of o.zones || []) sv('path', { d: arcPath(cx, cy, rt - 18, ang(z0), ang(z1)), stroke: c, 'stroke-width': 4, fill: 'none' }, g);
+  for (const [v, major, label] of o.ticks) {
+    const a = ang(v), [x0, y0] = P(cx, cy, rt, a), [x1, y1] = P(cx, cy, rt - (major ? 14 : 7), a);
+    sv('line', { x1: x0, y1: y0, x2: x1, y2: y1, stroke: major ? '#eef0ef' : '#8c918e', 'stroke-width': major ? 4 : 1.6, class: major ? '' : 'minor' }, g);
+    if (label != null) {
+      const ls = typeof o.lsize === 'function' ? o.lsize(v) : o.lsize, [lx, ly] = P(cx, cy, rt - 14 - ls * 0.95, a);
+      const t = sv('text', { x: lx, y: ly, 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-size': ls, fill: '#dfe2e0', class: 'sc' }, g);
+      t.textContent = label;
+    }
+  }
+  const txt = (y, size, fill, cls) => sv('text', { x: cx, y, 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-size': size, fill, class: cls || '' }, g);
+  const extra = sv('g', {}, g); // readouts sit under the needle
+  const needle = sv('g', {}, g), L = rt - 6, w = Math.max(3, R * 0.035);
+  sv('path', { d: `M${cx - R * 0.16} ${cy - w}L${cx + L} ${cy - 0.8}L${cx + L} ${cy + 0.8}L${cx - R * 0.16} ${cy + w}Z`, fill: '#e9ebea' }, needle);
+  sv('circle', { cx, cy, r: R * 0.11, fill: `url(#${id}bz)`, class: 'bezel' }, g);
+  sv('circle', { cx, cy, r: R * 0.055, fill: '#2b2e2c' }, g);
+  return {
+    g, txt, extra,
+    set(v) { needle.style.display = v == null ? 'none' : ''; if (v != null) needle.setAttribute('transform', `rotate(${ang(v).toFixed(2)} ${cx} ${cy})`); },
+  };
+}
+const span = (lo, hi, step, f) => { const out = []; for (let v = lo; v <= hi + 1e-9; v += step) out.push(f(+v.toFixed(3))); return out; };
+// speedometer: 0–140 gets most of the sweep, 140–260 is compressed with smaller numbers, as in the 9-3 NG
+const kmhAng = v => { v = Math.max(0, Math.min(260, v)); return v <= 140 ? 172 + v / 140 * 128 : 300 + (v - 140) / 120 * 82; };
+function cluster(s, id, k, t, c) {
+  const kmh = ngDial(s, id, { ...k, ang: kmhAng, lsize: v => v <= 140 ? k.R * 0.105 : k.R * 0.08,
+    ticks: [...span(0, 140, 10, v => [v, v % 20 === 0, v % 20 === 0 && v > 0 ? v : null]), ...span(150, 260, 10, v => [v, v % 20 === 0, v % 20 === 0 ? v : null])] });
+  const lcd = k.R * 0.46;
+  sv('rect', { x: k.cx - lcd, y: k.cy + k.R * 0.36, width: lcd * 2, height: k.R * 0.3, rx: 3, fill: '#030403', stroke: '#2a2d2b' }, kmh.extra);
+  kmh.val = kmh.txt(k.cy + k.R * 0.51, k.R * 0.22, 'var(--green)', 'big'); kmh.extra.appendChild(kmh.val);
+  const u = kmh.txt(k.cy + k.R * 0.22, k.R * 0.065, '#9a9f9c'); u.textContent = 'km/h'; kmh.extra.appendChild(u);
+  const rpm = ngDial(s, id, { ...t, ang: v => 140 + 260 * clamp01(v / 8), lsize: t.R * 0.17, zones: [[6, 8, 'var(--red)']],
+    ticks: span(0, 8, 0.5, v => [v, v % 1 === 0, v % 1 === 0 ? v : null]) });
+  rpm.val = rpm.txt(t.cy + t.R * 0.45, t.R * 0.2, 'var(--cap)', 'big'); rpm.extra.appendChild(rpm.val);
+  const ru = rpm.txt(t.cy - t.R * 0.36, t.R * 0.085, '#9a9f9c'); ru.textContent = '1/min x 1000'; rpm.extra.appendChild(ru);
   rpm.g.classList.add('tach');
-  const kmh = makeDial(s, { cx: kx, cy: ky, r: 160, lo: 0, hi: 260, minor: 5, mid: 10, major: 20, mode: 'needle', w: 6, lsize: 16, lcolor: 'var(--cap)' });
-  kmh.val = kmh.txt(ky + 76, 60, 'var(--green)', 'big');
-  kmh.txt(ky + 120, 14, 'var(--dim)').textContent = 'KM/H';
-  return { rpm, kmh };
+  const temp = ngDial(s, id, { ...c, ang: v => 150 + 240 * clamp01((v - 40) / 90), lsize: c.R * 0.15, zones: [[115, 130, 'var(--red)']],
+    ticks: span(40, 130, 10, v => [v, v === 40 || v === 90 || v === 130, v === 40 || v === 90 || v === 130 ? v : null]) });
+  temp.val = temp.txt(c.cy + c.R * 0.45, c.R * 0.2, 'var(--cap)', 'big'); temp.extra.appendChild(temp.val);
+  const tu = temp.txt(c.cy - c.R * 0.36, c.R * 0.085, '#9a9f9c'); tu.textContent = '°C'; temp.extra.appendChild(tu);
+  temp.g.classList.add('tach');
+  return { rpm, kmh, temp };
 }
 function buildDials() {
   const q = k => document.querySelector(`[data-dial="${k}"]`);
@@ -625,10 +673,10 @@ function buildDials() {
     zones: [[80, 105, 'var(--green-dim)'], [105, 115, 'var(--amber)'], [115, 130, 'var(--red)']] }, 84, '°C', 'MOTORTEMP');
   dials.volt = gauge('volt', { lo: 8, hi: 16, minor: 0.5, major: 2,
     zones: [[8, 11.8, 'var(--red)'], [13.2, 14.8, 'var(--green-dim)'], [15.2, 16, 'var(--amber)']] }, 76, 'V', 'BATTERI');
-  let s = q('speed'); s.setAttribute('viewBox', '0 0 860 340');
-  dials.speed = cluster(s, [205, 180], [655, 180]);
-  s = q('speedP'); s.setAttribute('viewBox', '30 0 350 640');
-  dials.speedP = cluster(s, [205, 180], [205, 490]);
+  let s = q('speed'); s.setAttribute('viewBox', '0 0 860 350');
+  dials.speed = cluster(s, 'cl', { cx: 430, cy: 175, R: 168 }, { cx: 140, cy: 222, R: 112 }, { cx: 720, cy: 222, R: 112 });
+  s = q('speedP'); s.setAttribute('viewBox', '0 0 410 640');
+  dials.speedP = cluster(s, 'cp', { cx: 205, cy: 192, R: 190 }, { cx: 103, cy: 530, R: 98 }, { cx: 307, cy: 530, R: 98 });
 }
 buildDials();
 
@@ -672,9 +720,10 @@ function render() {
   for (const c of [dials.speed, dials.speedP]) {
     c.rpm.set(live ? disp.rpm / 1000 : null); set(c.rpm.val, L(d.rpm, 0));
     c.kmh.set(live ? disp.speed : null); set(c.kmh.val, L(d.speed, 0));
+    c.temp.set(live ? d.coolant : null); set(c.temp.val, L(d.coolant, 0)); c.temp.val.setAttribute('fill', col(live && tC(d.coolant)));
   }
   set($('sBoost'), L(d.boost, 2)); cls($('sBoost'), live && bC(d.boost));
-  set($('sTemp'), L(d.coolant, 0)); cls($('sTemp'), live && tC(d.coolant));
+  set($('sFuel'), live && d.fuel != null ? d.fuel + ' %' : '--');
 
   // MOTORTEMP / BATTERI
   dials.temp.set(live ? d.coolant : null, col(live && tC(d.coolant)));
@@ -937,8 +986,8 @@ btnDemo.onclick = () => {
 const btnNight = $('btnNight'), speedSvg = document.querySelector('[data-dial="speed"]'), speedPSvg = document.querySelector('[data-dial="speedP"]');
 function setNight(on) {
   document.body.classList.toggle('night', on); btnNight.setAttribute('aria-pressed', String(on));
-  speedSvg.setAttribute('viewBox', on ? '450 0 410 340' : '0 0 860 340'); // night: speedometer only
-  speedPSvg.setAttribute('viewBox', on ? '30 310 350 330' : '30 0 350 640');
+  speedSvg.setAttribute('viewBox', on ? '254 0 352 352' : '0 0 860 350'); // night: speedometer only
+  speedPSvg.setAttribute('viewBox', on ? '10 0 390 390' : '0 0 410 640');
   requestAnimationFrame(() => { slidesEl.scrollLeft = state.slide * slidesEl.clientWidth; });
   try { localStorage.setItem('saab.night', on ? '1' : ''); } catch (e) {}
 }
