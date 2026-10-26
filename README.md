@@ -1,24 +1,37 @@
 # Saab Dash
 
-iPhone-ersättare för den runda CAN-displayen i Saab 9-3 (T8). En BLE-dongel i OBD-uttaget läser bilen och skickar färdiga värden till en webbapp som körs i Bluefy på telefonen.
+iPhone-ersättare för den runda CAN-displayen i Saab 9-3 (T8). En dongel i OBD-uttaget läser bilen, lagrar appen och strömmar värden till Safari över telefonens hotspot.
 
 ```
-Bil ─CAN (P-bus 500k)─ ESP32-dongel (WiCAN-OBD) ─BLE─ iPhone (Bluefy)
+Bil ─CAN (P-bus 500k)─ ESP32-dongel (WiCAN-OBD) ══ Wi-Fi (hotspot) ══ iPhone, Safari
 ```
 
 ## Innehåll
 | Sökväg | Vad |
 |---|---|
-| `PROTOCOL.md` | BLE-protokollet mellan dongel och app (GATT-UUID:er, paketformat, kommandon) |
+| `PROTOCOL.md` | Protokollet mellan dongel och app: WebSocket, paketformat, kommandon, uppdatering |
 | `web/app.html` | Appens källa |
-| `web/build.sh` | Bygger `docs/index.html` från källan |
-| `index.html`, `docs/index.html` | Fristående sida som GitHub Pages publicerar (byggs, ändra inte för hand) |
+| `web/build.sh` | Bygger `index.html`, `docs/index.html`, ikoner och `version.json` |
+| `index.html`, `docs/` | Byggd app som GitHub Pages publicerar (ändra inte för hand) |
+| `tools/mock_dongle.py` | Låtsasdongel för test utan hårdvara (bara Pythons standardbibliotek) |
 | `firmware/` | (kommer) ESP32-firmware för dongeln |
 
 ## Använda appen
-1. Öppna Pages-adressen i appen **Bluefy** på iPhone (Safari saknar Web Bluetooth).
-2. Tryck **Anslut** och välj `SAAB-…`. Utan dongel visar **Demo** simulerad data.
-3. Svep eller tryck för att byta sida. **Night** släcker allt utom det viktigaste. **Logg** visar paket, rådata och dongelns konsol.
+- **I bilen:** slå på hotspot, öppna `http://saab-dash.local` i Safari och lägg till på hemskärmen. Appen ansluter själv.
+- **Utan dongel:** GitHub Pages-adressen visar demoläge.
+- Svep eller tryck för att byta sida. **Night** släcker allt utom det viktigaste. **Logg** visar paket, rådata, dongelns konsol och uppdatering.
+
+## Uppdatera
+Öppna **Logg** i appen när den är öppnad från dongeln:
+- **Uppdatera appen** hämtar senaste `index.html` från GitHub Pages och skickar den till dongeln.
+- **Uppdatera firmware** hämtar senaste firmware när en sådan finns publicerad.
+- **Ladda upp fil…** skickar en `.html` (app) eller `.bin` (firmware) från iPhonens Filer-app.
+
+## Testa utan dongel
+```
+python3 tools/mock_dongle.py
+```
+Öppna `http://localhost:8080`, eller adressen som skrivs ut, från en iPhone på samma Wi-Fi.
 
 ## Utveckla
-Ändra `web/app.html`, kör `web/build.sh`, committa båda.
+Ändra `web/app.html`, kör `web/build.sh`, committa allt.

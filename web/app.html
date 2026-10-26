@@ -279,6 +279,11 @@ body.night #tState, body.night #vState { display: none; }
   -webkit-user-select: text; user-select: text;
 }
 .cmd { display: flex; gap: 8px; }
+.upd { display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 10px; }
+.upd-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.filebtn span { display: inline-block; font: 500 13px var(--font); letter-spacing: .1em; text-transform: uppercase; color: var(--cap);
+  border: 1px solid var(--line); border-radius: 4px; padding: 7px 11px; cursor: pointer; }
+#uMsg { white-space: normal; text-transform: none; letter-spacing: .02em; }
 .cmd input { flex: 1; min-width: 0; font: 14px ui-monospace, Menlo, monospace; color: #fff; background: #000; border: 1px solid var(--line); border-radius: 4px; padding: 8px 10px; }
 .err {
   position: fixed; left: 8px; right: 8px; top: calc(8px + env(safe-area-inset-top, 0px)); z-index: 9;
@@ -415,6 +420,19 @@ body.night #tState, body.night #vState { display: none; }
     <div class="stat"><span class="label">Senaste</span><b id="stAge">–</b></div>
   </div>
   <div class="stat"><span class="label">Rådata DATA</span><span class="hex" id="stHex">–</span></div>
+  <div class="upd">
+    <div class="stats">
+      <div class="stat"><span class="label">App</span><b id="uApp">–</b></div>
+      <div class="stat"><span class="label">Dongel</span><b id="uFw">–</b></div>
+      <div class="stat"><span class="label">Senaste app</span><b id="uLatest">–</b></div>
+    </div>
+    <div class="upd-btns">
+      <button id="uAppBtn" class="go">Uppdatera appen</button>
+      <button id="uFwBtn">Uppdatera firmware</button>
+      <label class="filebtn"><input type="file" id="uFile" accept=".html,.htm,.bin" hidden><span>Ladda upp fil…</span></label>
+    </div>
+    <div class="label" id="uMsg"></div>
+  </div>
   <pre class="log" id="log"></pre>
   <form class="cmd" id="cmdForm">
     <input id="cmdIn" placeholder="Konsolkommando, t.ex. v" autocomplete="off" autocapitalize="off" spellcheck="false">
@@ -435,15 +453,15 @@ window.addEventListener('error', showScriptError);
 window.addEventListener('unhandledrejection', showScriptError);
 </script>
 <script>
-/* Everything lives in this function scope: Bluefy injects its own scripts into the page,
-   and a top-level name clashing with one of theirs stops the whole app from running. */
+/* Everything lives in this function scope so no name can clash with scripts a browser
+   injects into the page (a clash stops the whole app from running). */
 (function () {
 'use strict';
 const BUILD = 'BUILD_STAMP';
 document.getElementById('chipTxt').textContent = 'Skript steg 1';
-/* ================= BLE protocol v1 (see PROTOCOL.md) ================= */
-const UUID = s => `7a5a${s}-5341-4142-9b3e-0c2a1d4e8f01`;
-const SVC = UUID('0001'), CH_DATA = UUID('0002'), CH_DTC = UUID('0003'), CH_CMD = UUID('0004'), CH_LOG = UUID('0005');
+/* ================= Protocol v2, Wi-Fi + WebSocket (see PROTOCOL.md) ================= */
+const MSG = { DATA: 0x01, DTC: 0x02, LOG: 0x03 };
+const UPDATE_BASE = 'https://tomdooley93-max.github.io/Saab-dash/'; // published builds (GitHub Pages)
 const SLIDE = { MAIN: 0, BOOST: 1, SPEED: 2, TEMP: 3, VOLT: 4, AIRMASS: 5, DTC: 6 };
 
 function parseData(dv) {
@@ -738,7 +756,7 @@ $('dClear').onclick = () => {
   log('Radera felkoder skickat');
 };
 
-/* incoming data (BLE or demo) */
+/* incoming data (dongle or demo) */
 let rx = 0, lost = 0, lastSeq = null, lastHex = '';
 function onData(dv) {
   const d = parseData(dv);
@@ -779,64 +797,122 @@ slidesEl.addEventListener('click', e => {
 });
 window.addEventListener('resize', () => { slidesEl.scrollLeft = state.slide * slidesEl.clientWidth; });
 
-/* ================= Bluetooth ================= */
-const ble = { dev: null, cmd: null, want: false, tries: 0 };
+/* ================= Dongle link (WebSocket on the same host that served the app) ================= */
+const link = { ws: null, want: false, tries: 0, onDongle: false, info: null, watchdog: 0 };
 const chip = $('chip'), chipTxt = $('chipTxt'), btnConn = $('btnConn'), btnDemo = $('btnDemo');
 function setStatus(s, t) { chip.dataset.s = s; chipTxt.textContent = t; }
 
-async function connect() {
-  if (!navigator.bluetooth) {
-    log('Webbläsaren saknar Web Bluetooth. Öppna sidan i Bluefy på iPhone (eller Chrome på dator/Android).');
-    setStatus('off', 'Ingen Bluetooth'); openSheet(); return;
-  }
+// The app knows it runs from the dongle when the same host answers /api/info.
+async function probeDongle() {
   try {
-    const dev = await navigator.bluetooth.requestDevice({ filters: [{ services: [SVC] }, { namePrefix: 'SAAB' }], optionalServices: [SVC] });
-    stopDemo();
-    ble.dev = dev; ble.want = true; ble.tries = 0;
-    dev.addEventListener('gattserverdisconnected', onDisconnect);
-    await attach();
-  } catch (e) { log('Anslutning avbruten: ' + e.message); if (!ble.dev) setStatus(state.mode === 'demo' ? 'demo' : 'off', state.mode === 'demo' ? 'Demo' : 'Ej ansluten'); }
+    const r = await fetch('api/info', { cache: 'no-store' });
+    if (!r.ok) return false;
+    const j = await r.json();
+    if (j.device !== 'saab-dash') return false;
+    link.info = j; renderUpdate(); return true;
+  } catch (e) { return false; }
 }
-async function attach() {
+function connect() {
+  if (!link.onDongle) {
+    log('Appen kan bara ansluta när den är öppnad från dongeln: slå på hotspot och öppna http://saab-dash.local');
+    openSheet(); return;
+  }
+  stopDemo(); link.want = true; open();
+}
+function open() {
   setStatus('wait', 'Ansluter…');
-  const srv = await ble.dev.gatt.connect();
-  const svc = await srv.getPrimaryService(SVC);
-  const sub = async (uuid, fn, required) => {
-    try { const c = await svc.getCharacteristic(uuid); c.addEventListener('characteristicvaluechanged', e => fn(e.target.value)); await c.startNotifications(); return c; }
-    catch (e) { if (required) throw e; log(`Saknar ${uuid.slice(4, 8)}: ${e.message}`); }
+  const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
+  ws.binaryType = 'arraybuffer'; link.ws = ws;
+  ws.onopen = () => {
+    link.tries = 0; state.mode = 'live'; lastSeq = null;
+    setStatus('on', 'Dongel'); btnConn.textContent = 'Koppla från';
+    log('Ansluten till dongeln'); sendCmd([0x10, state.slide]); keepAwake(); kick();
   };
-  await sub(CH_DATA, onData, true);
-  const dtc = await sub(CH_DTC, onDtc);
-  await sub(CH_LOG, dv => log('» ' + new TextDecoder().decode(dv).replace(/\s+$/, '')));
-  try { ble.cmd = await svc.getCharacteristic(CH_CMD); } catch (e) { ble.cmd = null; log('Saknar CMD'); }
-  if (dtc) try { onDtc(await dtc.readValue()); } catch (e) {}
-  state.mode = 'ble'; ble.tries = 0; lastSeq = null;
-  setStatus('on', ble.dev.name || 'Ansluten'); btnConn.textContent = 'Koppla från';
-  log('Ansluten till ' + (ble.dev.name || 'dongel'));
-  sendCmd([0x10, state.slide]);
-  keepAwake();
+  ws.onmessage = e => {
+    kick();
+    const dv = new DataView(e.data);
+    if (dv.byteLength < 1) return;
+    const body = new DataView(e.data, 1);
+    switch (dv.getUint8(0)) {
+      case MSG.DATA: onData(body); break;
+      case MSG.DTC: onDtc(body); break;
+      case MSG.LOG: log('» ' + new TextDecoder().decode(body).replace(/\s+$/, '')); break;
+    }
+  };
+  ws.onclose = () => {
+    clearTimeout(link.watchdog);
+    if (link.ws !== ws) return;
+    link.ws = null;
+    if (state.mode === 'live') { state.mode = 'off'; state.d = null; }
+    if (!link.want) return;
+    const wait = Math.min(8000, 500 * 2 ** link.tries++);
+    setStatus('wait', 'Söker dongel…'); log(`Ingen kontakt med dongeln, nytt försök om ${wait / 1000} s`);
+    setTimeout(() => { if (link.want && !link.ws) open(); }, wait);
+  };
 }
-function onDisconnect() {
-  ble.cmd = null;
-  if (!ble.want) return;
-  const wait = Math.min(8000, 500 * 2 ** ble.tries++);
-  setStatus('wait', 'Återansluter…'); log(`Tappade anslutningen, nytt försök om ${wait / 1000} s`);
-  setTimeout(() => { if (ble.want) attach().catch(e => { log('Återanslutning misslyckades: ' + e.message); onDisconnect(); }); }, wait);
-}
+// no message for 3 s = dead link (Wi-Fi gone), close so onclose reconnects
+function kick() { clearTimeout(link.watchdog); link.watchdog = setTimeout(() => { if (link.ws) link.ws.close(); }, 3000); }
 function disconnect() {
-  ble.want = false;
-  if (ble.dev?.gatt.connected) ble.dev.gatt.disconnect();
-  ble.dev = null; ble.cmd = null; state.mode = 'off'; state.d = null;
+  link.want = false; clearTimeout(link.watchdog);
+  const ws = link.ws; link.ws = null; if (ws) ws.close();
+  state.mode = 'off'; state.d = null;
   setStatus('off', 'Ej ansluten'); btnConn.textContent = 'Anslut'; log('Frånkopplad');
 }
-let cmdQ = Promise.resolve();
 function sendCmd(bytes) {
-  if (state.mode !== 'ble' || !ble.cmd) return;
-  const buf = new Uint8Array(bytes);
-  cmdQ = cmdQ.then(() => ble.cmd.writeValueWithoutResponse ? ble.cmd.writeValueWithoutResponse(buf) : ble.cmd.writeValue(buf))
-             .catch(e => log('CMD-fel: ' + e.message));
+  if (state.mode !== 'live' || !link.ws || link.ws.readyState !== 1) return;
+  link.ws.send(new Uint8Array(bytes));
 }
-btnConn.onclick = () => (state.mode === 'ble' || ble.want) ? disconnect() : connect();
+btnConn.onclick = () => (state.mode === 'live' || link.want) ? disconnect() : connect();
+
+/* ================= Updates (from GitHub Pages or a file, pushed to the dongle) ================= */
+const uMsg = $('uMsg');
+let latest = null;
+function renderUpdate() {
+  $('uApp').textContent = BUILD;
+  $('uFw').textContent = link.info ? (link.info.fw || '?') : '–';
+  $('uLatest').textContent = latest ? latest.app : '–';
+  $('uAppBtn').disabled = !link.onDongle;
+  $('uFwBtn').disabled = !link.onDongle || !(latest && latest.fw);
+  $('uFile').disabled = !link.onDongle;
+  if (!link.onDongle) uMsg.textContent = 'Uppdatering görs när appen är öppnad från dongeln (http://saab-dash.local).';
+  else if (latest && latest.app && latest.app !== BUILD) uMsg.textContent = 'En nyare app finns på GitHub.';
+}
+async function checkLatest() {
+  try { const r = await fetch(UPDATE_BASE + 'version.json', { cache: 'no-store' }); if (r.ok) latest = await r.json(); } catch (e) {}
+  renderUpdate();
+}
+async function push(path, body, type, what) {
+  uMsg.textContent = `Skickar ${what} till dongeln (${Math.round(body.byteLength / 1024)} kB)…`;
+  const r = await fetch(path, { method: 'POST', headers: { 'Content-Type': type }, body });
+  if (!r.ok) throw new Error(`dongeln svarade ${r.status}`);
+}
+async function updateApp(buf) {
+  await push('api/app', buf, 'text/html', 'appen');
+  uMsg.textContent = 'Appen uppdaterad, laddar om…'; log('Appen uppdaterad');
+  setTimeout(() => location.reload(), 600);
+}
+async function updateFw(buf) {
+  await push('api/ota', buf, 'application/octet-stream', 'firmware');
+  uMsg.textContent = 'Firmware skickad. Dongeln startar om och appen ansluter igen när den är tillbaka.'; log('Firmware skickad, dongeln startar om');
+}
+const guard = fn => async () => { try { await fn(); } catch (e) { uMsg.textContent = 'Uppdateringen misslyckades: ' + e.message; log('Uppdatering misslyckades: ' + e.message); } };
+$('uAppBtn').onclick = guard(async () => {
+  uMsg.textContent = 'Hämtar senaste appen från GitHub…';
+  const r = await fetch(UPDATE_BASE + 'index.html', { cache: 'no-store' });
+  if (!r.ok) throw new Error(`GitHub svarade ${r.status}`);
+  await updateApp(await r.arrayBuffer());
+});
+$('uFwBtn').onclick = guard(async () => {
+  uMsg.textContent = 'Hämtar senaste firmware från GitHub…';
+  const r = await fetch(UPDATE_BASE + latest.fw, { cache: 'no-store' });
+  if (!r.ok) throw new Error(`GitHub svarade ${r.status}`);
+  await updateFw(await r.arrayBuffer());
+});
+$('uFile').onchange = guard(async () => {
+  const f = $('uFile').files[0]; if (!f) return;
+  const buf = await f.arrayBuffer(); $('uFile').value = '';
+  if (/\.bin$/i.test(f.name)) await updateFw(buf); else await updateApp(buf);
+});
 
 let wake = null;
 async function keepAwake() { try { if (!wake && navigator.wakeLock) { wake = await navigator.wakeLock.request('screen'); wake.addEventListener('release', () => { wake = null; }); } } catch (e) {} }
@@ -877,7 +953,7 @@ function startDemo() {
 function stopDemo() { clearInterval(demo.timer); demo.timer = 0; btnDemo.setAttribute('aria-pressed', 'false'); if (state.mode === 'demo') { state.mode = 'off'; state.d = null; setStatus('off', 'Ej ansluten'); } }
 btnDemo.onclick = () => {
   if (demo.timer) { stopDemo(); return; }
-  if (state.mode === 'ble' || ble.want) disconnect();
+  if (state.mode === 'live' || link.want) disconnect();
   startDemo();
 };
 
@@ -904,7 +980,7 @@ $('btnLogClear').onclick = () => { lines.length = 0; lost = 0; logEl.textContent
 $('cmdForm').addEventListener('submit', e => {
   e.preventDefault();
   const v = $('cmdIn').value.trim(); if (!v) return;
-  if (state.mode !== 'ble') { log('Kommandon kräver anslutning till dongeln'); return; }
+  if (state.mode !== 'live') { log('Kommandon kräver anslutning till dongeln'); return; }
   sendCmd([0x30, ...new TextEncoder().encode(v)]); log('« ' + v); $('cmdIn').value = '';
 });
 setInterval(() => {
@@ -918,9 +994,15 @@ setStatus('wait', 'Skript steg 2');
 log('Version ' + BUILD + ' · ' + navigator.userAgent);
 let startSlide = 0; try { startSlide = +localStorage.getItem('saab.slide') || 0; setNight(!!localStorage.getItem('saab.night')); } catch (e) {}
 renderDtc();
-startDemo();
+renderUpdate();
+checkLatest();
+probeDongle().then(on => {
+  link.onDongle = on;
+  if (on) { log('Öppnad från dongeln (fw ' + (link.info.fw || '?') + '), ansluter'); connect(); }
+  else { log('Ingen dongel på den här adressen, visar demo'); startDemo(); }
+  renderUpdate();
+});
 requestAnimationFrame(() => { render(); try { goSlide(Math.min(startSlide, pages.length - 1)); } catch (e) { showScriptError(e); } });
-if (!navigator.bluetooth) log('Obs: Web Bluetooth saknas i den här webbläsaren. På iPhone: öppna sidan i appen Bluefy.');
 window.saabDash = { goSlide, setNight, showAlert, build: BUILD }; // for testing from the console
 })();
 </script>
