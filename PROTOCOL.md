@@ -15,7 +15,8 @@ Bil ─CAN─ Dongel (ESP32) ══ Wi-Fi (telefonens hotspot) ══ iPhone, Sa
 ```
 
 - Dongeln ansluter som klient till telefonens personliga hotspot (station-läge).
-  SSID och lösenord ställs in en gång via dongelns inställningar.
+  SSID och lösenord ställs in en gång med konsolkommandot `wifi`. Utan sparad hotspot,
+  eller om ingen hittas på 30 s, öppnar dongeln ett eget nät `Saab-Dash` (appen på `http://192.168.4.1`).
 - Dongeln annonserar sig med mDNS som **`saab-dash.local`**. Fungerar inte mDNS
   används dongelns IP-adress på hotspot-nätet.
 - Appen laddas från dongeln, så sidan och WebSocket har samma ursprung. (En sida från
@@ -43,7 +44,7 @@ anslutningen och ansluter igen.
 | `0x01` | – | Radera felkoder (KWP ClearDiagnosticInformation) |
 | `0x02` | – | Läs om felkoderna |
 | `0x10` | u8 sid-id | Aktiv sida. Dongeln håller diagnossessionen för dynsym bara när sidan är LUFTMASSA. |
-| `0x30` | ASCII-text | Konsolkommando (t.ex. `v`). Svaret kommer som LOG. |
+| `0x30` | UTF-8-text | Konsolkommando: `v` (versioner), `wifi SSID\|LÖSENORD` (spara hotspot), `reboot`. Svaret kommer som LOG. |
 
 Sid-id: 0 ÖVERSIKT, 1 LADDTRYCK, 2 FART, 3 MOTORTEMP, 4 BATTERI, 5 LUFTMASSA, 6 FELKODER.
 
