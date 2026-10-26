@@ -21,6 +21,7 @@ void app_main(void)
     net_start();
     web_start();
     car_start();
+    power_start();
 
     // Reaching this point means the new firmware boots and serves; keep it.
     esp_ota_mark_app_valid_cancel_rollback();

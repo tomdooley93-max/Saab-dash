@@ -20,3 +20,9 @@ void dash_log(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 void car_start(void);
 void car_command(int fd, const uint8_t *b, size_t len);
 size_t car_dtc(uint8_t *out, size_t n);
+int car_idle_ms(void);          // since the last CAN frame
+void car_sleep(void);           // CAN off, transceiver to standby
+
+// power.c: battery voltage and sleep while the car is off
+void power_start(void);
+float power_vbat(void);         // volts, < 0 unknown

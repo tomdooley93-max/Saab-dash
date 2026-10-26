@@ -44,7 +44,7 @@ anslutningen och ansluter igen.
 | `0x01` | – | Radera felkoder (KWP ClearDiagnosticInformation) |
 | `0x02` | – | Läs om felkoderna |
 | `0x10` | u8 sid-id | Aktiv sida. Dongeln håller diagnossessionen för dynsym bara när sidan är LUFTMASSA. |
-| `0x30` | UTF-8-text | Konsolkommando: `v` (versioner), `wifi SSID\|LÖSENORD` (spara hotspot), `reboot`. Svaret kommer som LOG. |
+| `0x30` | UTF-8-text | Konsolkommando: `v` (versioner), `can` (bussens status), `wifi SSID\|LÖSENORD` (spara hotspot), `reboot`. Svaret kommer som LOG. |
 
 Sid-id: 0 ÖVERSIKT, 1 LADDTRYCK, 2 FART, 3 MOTORTEMP, 4 BATTERI, 5 LUFTMASSA, 6 FELKODER.
 
@@ -97,4 +97,5 @@ bit 11–0 = tre hexsiffror. Exempel: `0x0171` → P0171. Högst 16 koder.
 - **Från telefonen:** appens Logg-panel kan hämta senaste app och firmware från GitHub Pages
   (`version.json`, `index.html`, `fw/saab-dash.bin`) över hotspotens internet och skicka dem
   till dongeln, eller ladda upp en fil från iPhonens Filer-app.
+- **Viloläge:** under 13,1 V och tyst CAN-buss i 1 minut sover dongeln (CAN och Wi-Fi av). Den vaknar när spänningen går över 13,1 V (motorn går) eller när det blir trafik på bussen.
 - **Nödläge:** startar dongeln inte alls flashas den med USB-kabel enligt WiCANs manual.

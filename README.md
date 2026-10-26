@@ -14,7 +14,7 @@ Bil ─CAN (P-bus 500k)─ ESP32-dongel (WiCAN-OBD) ══ Wi-Fi (hotspot) ═�
 | `web/build.sh` | Bygger `index.html`, `docs/index.html`, ikoner och `version.json` |
 | `index.html`, `docs/` | Byggd app som GitHub Pages publicerar (ändra inte för hand) |
 | `tools/mock_dongle.py` | Låtsasdongel för test utan hårdvara (bara Pythons standardbibliotek) |
-| `firmware/` | ESP32-C3-firmware för dongeln (ESP-IDF). Byggs av GitHub Actions. CAN är inte inkopplat än. |
+| `firmware/` | ESP32-C3-firmware för dongeln (ESP-IDF). Byggs av GitHub Actions. CAN-avkodningen är flyttad från den gamla Pico-mätaren. Inte provkörd i bil än. |
 
 ## Använda appen
 - **I bilen:** slå på hotspot, öppna `http://saab-dash.local` i Safari och lägg till på hemskärmen. Appen ansluter själv.

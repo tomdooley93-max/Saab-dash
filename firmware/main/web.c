@@ -118,14 +118,15 @@ static const char *app_build(void)
 
 static esp_err_t info_get(httpd_req_t *req)
 {
-    char ip[16], json[256];
+    char ip[16], json[256], v[16] = "null";
     int rssi;
     net_info(ip, sizeof ip, &rssi);
-    // vbat is null until the dongle's voltage divider is read
+    float vbat = power_vbat();
+    if (vbat > 0) snprintf(v, sizeof v, "%.1f", vbat);
     snprintf(json, sizeof json,
              "{\"device\":\"saab-dash\",\"fw\":\"%s\",\"app\":\"%s\",\"ip\":\"%s\",\"rssi\":%d,"
-             "\"uptime\":%lld,\"vbat\":null}",
-             esp_app_get_description()->version, app_build(), ip, rssi, esp_timer_get_time() / 1000000);
+             "\"uptime\":%lld,\"vbat\":%s}",
+             esp_app_get_description()->version, app_build(), ip, rssi, esp_timer_get_time() / 1000000, v);
     return send_json(req, "200 OK", json);
 }
 
