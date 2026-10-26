@@ -316,7 +316,8 @@ body.night.cel .cel-night { display: block; }
 
     <!-- LADDTRYCK -->
     <section class="page p-dial" data-name="Laddtryck">
-      <svg class="ldial" data-dial="boost"></svg>
+      <svg class="ldial p-only" data-dial="boost"></svg>
+      <svg class="ldial l-only" data-dial="boostL"></svg>
       <div class="kv">
         <div class="stat"><span class="label">Max</span><b id="bMax">--</b></div>
         <div class="stat"><span class="label">Insug °C</span><b id="bIat">--</b></div>
@@ -337,7 +338,8 @@ body.night.cel .cel-night { display: block; }
 
     <!-- MOTORTEMP -->
     <section class="page p-dial" data-name="Motortemp">
-      <svg class="ldial" data-dial="temp"></svg>
+      <svg class="ldial p-only" data-dial="temp"></svg>
+      <svg class="ldial l-only" data-dial="tempL"></svg>
       <div class="kv">
         <div class="stat"><span class="label">Min</span><b id="tMin">--</b></div>
         <div class="stat"><span class="label">Max</span><b id="tMax">--</b></div>
@@ -347,7 +349,8 @@ body.night.cel .cel-night { display: block; }
 
     <!-- BATTERI -->
     <section class="page p-dial" data-name="Batteri">
-      <svg class="ldial" data-dial="volt"></svg>
+      <svg class="ldial p-only" data-dial="volt"></svg>
+      <svg class="ldial l-only" data-dial="voltL"></svg>
       <div class="kv">
         <div class="stat"><span class="label">Min</span><b id="vMin">--</b></div>
         <div class="stat"><span class="label">Max</span><b id="vMax">--</b></div>
@@ -625,6 +628,7 @@ function ngDial(svg, id, o) {
     }
   }
   const txt = (y, size, fill, cls) => sv('text', { x: cx, y, 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-size': size, fill, class: cls || '' }, g);
+  const pk = o.peak ? sv('line', { stroke: 'var(--amber)', 'stroke-width': 4 }, g) : null;
   const extra = sv('g', {}, g); // readouts sit under the needle
   const needle = sv('g', {}, g), L = rt - 6, w = Math.max(3, R * 0.035);
   sv('path', { d: `M${cx - R * 0.16} ${cy - w}L${cx + L} ${cy - 0.8}L${cx + L} ${cy + 0.8}L${cx - R * 0.16} ${cy + w}Z`, fill: '#e9ebea' }, needle);
@@ -633,7 +637,20 @@ function ngDial(svg, id, o) {
   return {
     g, txt, extra,
     set(v) { needle.style.display = v == null ? 'none' : ''; if (v != null) needle.setAttribute('transform', `rotate(${ang(v).toFixed(2)} ${cx} ${cy})`); },
+    // session max: a short amber mark just inside the ticks
+    peak(v) {
+      if (!pk) return;
+      pk.style.display = v == null ? 'none' : '';
+      if (v == null) return;
+      const [x0, y0] = P(cx, cy, rt + 2, ang(v)), [x1, y1] = P(cx, cy, rt - 16, ang(v));
+      pk.setAttribute('x1', x0); pk.setAttribute('y1', y0); pk.setAttribute('x2', x1); pk.setAttribute('y2', y1);
+    },
   };
+}
+// digital readout under the hub: same placement, colour and proportion on every needle dial
+function readout(d, c, R, unit) {
+  d.val = d.txt(c.cy + R * 0.45, R * 0.2, 'var(--cap)', 'big'); d.extra.appendChild(d.val);
+  const u = d.txt(c.cy + R * 0.62, R * 0.075, '#9a9f9c'); u.textContent = unit; d.extra.appendChild(u);
 }
 const span = (lo, hi, step, f) => { const out = []; for (let v = lo; v <= hi + 1e-9; v += step) out.push(f(+v.toFixed(3))); return out; };
 // speedometer: 0–140 gets most of the sweep, 140–260 is compressed with smaller numbers, as in the 9-3 NG
@@ -641,11 +658,6 @@ const kmhAng = v => { v = Math.max(0, Math.min(260, v)); return v <= 140 ? 172 +
 function cluster(s, id, k, t, c) {
   const kmh = ngDial(s, id, { ...k, ang: kmhAng, lsize: v => v <= 140 ? k.R * 0.105 : k.R * 0.08,
     ticks: [...span(0, 140, 10, v => [v, v % 20 === 0, v % 20 === 0 && v > 0 ? v : null]), ...span(150, 260, 10, v => [v, v % 20 === 0, v % 20 === 0 ? v : null])] });
-  // digital readout: same placement, colour and proportion on all three dials
-  const readout = (d, c, R, unit) => {
-    d.val = d.txt(c.cy + R * 0.45, R * 0.2, 'var(--cap)', 'big'); d.extra.appendChild(d.val);
-    const u = d.txt(c.cy + R * 0.62, R * 0.075, '#9a9f9c'); u.textContent = unit; d.extra.appendChild(u);
-  };
   readout(kmh, k, k.R, 'km/h');
   const rpm = ngDial(s, id, { ...t, ang: v => 140 + 260 * clamp01(v / 8), lsize: t.R * 0.17, zones: [[6, 8, 'var(--red)']],
     ticks: span(0, 8, 0.5, v => [v, v % 1 === 0, v % 1 === 0 ? v : null]) });
@@ -675,6 +687,21 @@ function buildDials() {
     zones: [[80, 105, 'var(--green-dim)'], [105, 115, 'var(--amber)'], [115, 130, 'var(--red)']] }, 84, '°C', 'MOTORTEMP');
   dials.volt = gauge('volt', { lo: 8, hi: 16, minor: 0.5, major: 2,
     zones: [[8, 11.8, 'var(--red)'], [13.2, 14.8, 'var(--green-dim)'], [15.2, 16, 'var(--amber)']] }, 76, 'V', 'BATTERI');
+  // landscape: the same three instruments in the chrome cluster style
+  const chrome = (k, o, unit, name) => {
+    const s = q(k), c = { cx: 160, cy: 160, R: 152 }; s.setAttribute('viewBox', '0 0 320 320');
+    const d = ngDial(s, k, { ...c, lsize: c.R * 0.13, ...o });
+    readout(d, c, c.R, unit);
+    const n = d.txt(c.cy - c.R * 0.36, c.R * 0.075, '#9a9f9c'); n.textContent = name; d.extra.appendChild(n);
+    d.sub = d.txt(c.cy + c.R * 0.8, c.R * 0.075, 'var(--dim)', 'sub'); d.extra.appendChild(d.sub);
+    return d;
+  };
+  dials.boostL = chrome('boostL', { ang: v => 150 + 240 * clamp01((v + 1) / 3), peak: true, zones: [[-1, 0, 'var(--vac)'], [1.6, 2, 'var(--red)']],
+    ticks: span(-1, 2, 0.1, v => [v, Math.abs(v * 2 - Math.round(v * 2)) < 1e-6, Math.abs(v - Math.round(v)) < 1e-6 ? (v > 0 ? '+' : '') + Math.round(v) : null]) }, 'bar', 'LADDTRYCK');
+  dials.tempL = chrome('tempL', { ang: v => 150 + 240 * clamp01((v - 50) / 80), zones: [[105, 115, 'var(--amber)'], [115, 130, 'var(--red)']],
+    ticks: span(50, 130, 5, v => [v, v % 10 === 0, v % 20 === 10 ? v : null]) }, '°C', 'MOTORTEMP');
+  dials.voltL = chrome('voltL', { ang: v => 150 + 240 * clamp01((v - 8) / 8), zones: [[8, 11.8, 'var(--red)'], [15.2, 16, 'var(--amber)']],
+    ticks: span(8, 16, 0.5, v => [v, v % 1 === 0, v % 2 === 0 ? v : null]) }, 'V', 'BATTERI');
   let s = q('speed'); s.setAttribute('viewBox', '0 0 860 350');
   dials.speed = cluster(s, 'cl', { cx: 430, cy: 175, R: 168 }, { cx: 140, cy: 222, R: 112 }, { cx: 720, cy: 222, R: 112 });
   s = q('speedP'); s.setAttribute('viewBox', '0 0 410 640');
@@ -716,6 +743,8 @@ function render() {
   // LADDTRYCK
   dials.boost.set(live ? disp.boost : null, col(live && bC(d.boost))); dials.boost.peak(sess.bMax);
   set(dials.boost.val, L(d.boost, 2)); placeUnit(dials.boost.val); dials.boost.val.setAttribute('fill', col(live && bC(d.boost)));
+  dials.boostL.set(live ? disp.boost : null); dials.boostL.peak(sess.bMax); set(dials.boostL.val, L(d.boost, 2));
+  dials.boostL.val.setAttribute('fill', live && bC(d.boost) ? col(bC(d.boost)) : 'var(--cap)');
   set($('bMax'), fmt(sess.bMax, 2)); set($('bIat'), L(d.iat, 0)); set($('bAfr'), L(d.afr, 1));
 
   // FART
@@ -731,10 +760,14 @@ function render() {
   dials.temp.set(live ? d.coolant : null, col(live && tC(d.coolant)));
   set(dials.temp.val, L(d.coolant, 0)); placeUnit(dials.temp.val); dials.temp.val.setAttribute('fill', col(live && tC(d.coolant)));
   set(dials.temp.sub, !live ? '' : d.coolant < 70 ? 'KALL MOTOR' : tC(d.coolant) === 'crit' ? 'FÖR VARM' : tC(d.coolant) ? 'VARM' : 'NORMAL');
+  dials.tempL.set(live ? d.coolant : null); set(dials.tempL.val, L(d.coolant, 0)); set(dials.tempL.sub, dials.temp.sub.textContent);
+  dials.tempL.val.setAttribute('fill', live && tC(d.coolant) ? col(tC(d.coolant)) : 'var(--cap)');
   set($('tMin'), fmt(sess.tMin, 0)); set($('tMax'), fmt(sess.tMax, 0)); set($('tIat'), L(d.iat, 0));
   dials.volt.set(live ? d.batt : null, col(live && vC(d.batt)));
   set(dials.volt.val, L(d.batt, 1)); placeUnit(dials.volt.val); dials.volt.val.setAttribute('fill', col(live && vC(d.batt)));
   set(dials.volt.sub, !live ? '' : d.batt < 11.8 ? 'LÅG SPÄNNING' : d.batt > 15.2 ? 'HÖG SPÄNNING' : d.batt >= 13.2 ? 'LADDAR' : 'LADDAR EJ');
+  dials.voltL.set(live ? d.batt : null); set(dials.voltL.val, L(d.batt, 1)); set(dials.voltL.sub, dials.volt.sub.textContent);
+  dials.voltL.val.setAttribute('fill', live && vC(d.batt) ? col(vC(d.batt)) : 'var(--cap)');
   set($('vMin'), fmt(sess.vMin, 1)); set($('vMax'), fmt(sess.vMax, 1));
 
   // LUFTMASSA
