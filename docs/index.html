@@ -3,11 +3,17 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-title" content="Saab Dash">
+<meta name="application-name" content="Saab Dash">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#000000">
 </head>
 <body>
-<title>Saab Gauge</title>
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="theme-color" content="#000000">
+<title>Saab Dash</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@300;500&family=Barlow+Semi+Condensed:wght@400;500;600&family=Saira+Semi+Condensed:wght@400;500&display=swap">
 <style>
@@ -39,7 +45,8 @@ body {
   background: var(--bg); color: var(--cap); font-family: var(--font); margin: 0; overflow: hidden;
   -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
 }
-.app { height: 100%; display: flex; flex-direction: column; transition: filter .3s; }
+.app { height: 100%; display: flex; flex-direction: column; box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); /* home-screen (full-screen) mode */ transition: filter .3s; }
 .night-exit { display: none; }
 
 /* ---------- Night Panel ----------
@@ -447,7 +454,7 @@ window.addEventListener('unhandledrejection', showScriptError);
    and a top-level name clashing with one of theirs stops the whole app from running. */
 (function () {
 'use strict';
-const BUILD = '20261011-0624';
+const BUILD = '20261026-0332';
 document.getElementById('chipTxt').textContent = 'Skript steg 1';
 /* ================= BLE protocol v1 (see PROTOCOL.md) ================= */
 const UUID = s => `7a5a${s}-5341-4142-9b3e-0c2a1d4e8f01`;

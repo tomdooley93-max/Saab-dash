@@ -1,6 +1,4 @@
-<title>Saab Gauge</title>
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="theme-color" content="#000000">
+<title>Saab Dash</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@300;500&family=Barlow+Semi+Condensed:wght@400;500;600&family=Saira+Semi+Condensed:wght@400;500&display=swap">
 <style>
@@ -32,7 +30,8 @@ body {
   background: var(--bg); color: var(--cap); font-family: var(--font); margin: 0; overflow: hidden;
   -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
 }
-.app { height: 100%; display: flex; flex-direction: column; transition: filter .3s; }
+.app { height: 100%; display: flex; flex-direction: column; box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); /* home-screen (full-screen) mode */ transition: filter .3s; }
 .night-exit { display: none; }
 
 /* ---------- Night Panel ----------
