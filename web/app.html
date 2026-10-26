@@ -641,19 +641,21 @@ const kmhAng = v => { v = Math.max(0, Math.min(260, v)); return v <= 140 ? 172 +
 function cluster(s, id, k, t, c) {
   const kmh = ngDial(s, id, { ...k, ang: kmhAng, lsize: v => v <= 140 ? k.R * 0.105 : k.R * 0.08,
     ticks: [...span(0, 140, 10, v => [v, v % 20 === 0, v % 20 === 0 && v > 0 ? v : null]), ...span(150, 260, 10, v => [v, v % 20 === 0, v % 20 === 0 ? v : null])] });
-  const lcd = k.R * 0.46;
-  sv('rect', { x: k.cx - lcd, y: k.cy + k.R * 0.36, width: lcd * 2, height: k.R * 0.3, rx: 3, fill: '#030403', stroke: '#2a2d2b' }, kmh.extra);
-  kmh.val = kmh.txt(k.cy + k.R * 0.51, k.R * 0.22, 'var(--green)', 'big'); kmh.extra.appendChild(kmh.val);
-  const u = kmh.txt(k.cy + k.R * 0.22, k.R * 0.065, '#9a9f9c'); u.textContent = 'km/h'; kmh.extra.appendChild(u);
+  // digital readout: same placement, colour and proportion on all three dials
+  const readout = (d, c, R, unit) => {
+    d.val = d.txt(c.cy + R * 0.45, R * 0.2, 'var(--cap)', 'big'); d.extra.appendChild(d.val);
+    const u = d.txt(c.cy + R * 0.62, R * 0.075, '#9a9f9c'); u.textContent = unit; d.extra.appendChild(u);
+  };
+  readout(kmh, k, k.R, 'km/h');
   const rpm = ngDial(s, id, { ...t, ang: v => 140 + 260 * clamp01(v / 8), lsize: t.R * 0.17, zones: [[6, 8, 'var(--red)']],
     ticks: span(0, 8, 0.5, v => [v, v % 1 === 0, v % 1 === 0 ? v : null]) });
-  rpm.val = rpm.txt(t.cy + t.R * 0.45, t.R * 0.2, 'var(--cap)', 'big'); rpm.extra.appendChild(rpm.val);
-  const ru = rpm.txt(t.cy - t.R * 0.36, t.R * 0.085, '#9a9f9c'); ru.textContent = '1/min x 1000'; rpm.extra.appendChild(ru);
+  readout(rpm, t, t.R, 'varv/min');
+  const ru = rpm.txt(t.cy - t.R * 0.36, t.R * 0.085, '#9a9f9c'); ru.textContent = 'x 1000'; rpm.extra.appendChild(ru);
   rpm.g.classList.add('tach');
-  const temp = ngDial(s, id, { ...c, ang: v => 150 + 240 * clamp01((v - 40) / 90), lsize: c.R * 0.15, zones: [[115, 130, 'var(--red)']],
-    ticks: span(40, 130, 10, v => [v, v === 40 || v === 90 || v === 130, v === 40 || v === 90 || v === 130 ? v : null]) });
-  temp.val = temp.txt(c.cy + c.R * 0.45, c.R * 0.2, 'var(--cap)', 'big'); temp.extra.appendChild(temp.val);
-  const tu = temp.txt(c.cy - c.R * 0.36, c.R * 0.085, '#9a9f9c'); tu.textContent = '°C'; temp.extra.appendChild(tu);
+  // 50–130 so that normal (90) sits straight up
+  const temp = ngDial(s, id, { ...c, ang: v => 150 + 240 * clamp01((v - 50) / 80), lsize: c.R * 0.15, zones: [[115, 130, 'var(--red)']],
+    ticks: span(50, 130, 10, v => [v, v % 40 === 10, v % 40 === 10 ? v : null]) });
+  readout(temp, c, c.R, '°C');
   temp.g.classList.add('tach');
   return { rpm, kmh, temp };
 }
@@ -720,7 +722,7 @@ function render() {
   for (const c of [dials.speed, dials.speedP]) {
     c.rpm.set(live ? disp.rpm / 1000 : null); set(c.rpm.val, L(d.rpm, 0));
     c.kmh.set(live ? disp.speed : null); set(c.kmh.val, L(d.speed, 0));
-    c.temp.set(live ? d.coolant : null); set(c.temp.val, L(d.coolant, 0)); c.temp.val.setAttribute('fill', col(live && tC(d.coolant)));
+    c.temp.set(live ? d.coolant : null); set(c.temp.val, L(d.coolant, 0)); c.temp.val.setAttribute('fill', live && tC(d.coolant) ? col(tC(d.coolant)) : 'var(--cap)'); // only warnings get colour
   }
   set($('sBoost'), L(d.boost, 2)); cls($('sBoost'), live && bC(d.boost));
   set($('sFuel'), live && d.fuel != null ? d.fuel + ' %' : '--');
