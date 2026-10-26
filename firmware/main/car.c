@@ -415,7 +415,7 @@ void car_start(void)
     gpio_set_direction(CAN_STDBY, GPIO_MODE_OUTPUT);
     gpio_set_level(CAN_STDBY, 0);
     twai_general_config_t g = TWAI_GENERAL_CONFIG_DEFAULT(CAN_TX, CAN_RX, TWAI_MODE_NORMAL);
-    g.rx_queue_len = 32;
+    g.rx_queue_len = 64;            // the P-bus is busy; dropped frames could be ECU replies
     twai_timing_config_t t = TWAI_TIMING_CONFIG_500KBITS();
     twai_filter_config_t f = TWAI_FILTER_CONFIG_ACCEPT_ALL();
     ESP_ERROR_CHECK(twai_driver_install(&g, &t, &f));
