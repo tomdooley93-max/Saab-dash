@@ -106,6 +106,8 @@ button:disabled { opacity: .35; }
   position: absolute; left: 16px; right: 16px; top: 12px; z-index: 2; text-align: center; pointer-events: none;
   font-size: 13px; letter-spacing: .16em; color: var(--amber); padding: 6px; border: 1px solid #4a2600; border-radius: 4px; background: #0d0700;
 }
+.vbat { font-variant-numeric: tabular-nums; }
+.vbat.warn { color: var(--amber); } .vbat.crit { color: var(--red); }
 .cel-lamp { width: 26px; height: 18px; fill: var(--cel); display: none; flex: none; }
 body.cel .strip .cel-lamp { display: block; }
 .cel-night { position: absolute; left: 16px; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); z-index: 2; width: 30px; height: 21px; pointer-events: none; }
@@ -173,7 +175,7 @@ body.night.cel .cel-night { display: block; }
 .tile .scale.h { height: 14px; } .tile .scale .lb, .tile .scale .tk { display: none; }
 .tile-head { display: flex; justify-content: space-between; }
 
-/* LADDTRYCK / MOTORTEMP / BATTERI: instrument + key values */
+/* LADDTRYCK / MOTORTEMP: instrument + key values */
 .p-dial { grid-template-rows: auto auto auto; align-content: center; row-gap: 18px; }
 .p-dial .ldial { height: auto; max-height: 100%; }
 .p-dial .reset { justify-self: start; }
@@ -294,6 +296,7 @@ body.night.cel .cel-night { display: block; }
   <div class="strip top">
     <span class="label chip" id="chip" data-s="wait"><i></i><span id="chipTxt">Skript startar inte</span></span>
     <svg class="cel-lamp" viewBox="0 0 64 44" aria-label="Motorlampa"><use href="#i-cel"/></svg>
+    <span class="label vbat l-only" title="Batteri">-- V</span>
     <span class="grow"></span>
     <span class="label page-name" id="pageName">Översikt</span>
     <span class="grow"></span>
@@ -307,7 +310,7 @@ body.night.cel .cel-night { display: block; }
   <div class="slides" id="slides">
 
     <!-- ÖVERSIKT -->
-    <section class="page p-main" data-name="Översikt">
+    <section class="page p-main" data-name="Översikt" data-id="0">
       <div class="tile" data-k="boost"><div class="tile-head"><span class="label">Laddtryck</span></div><div class="num"><span data-v>--</span><span class="u">bar</span></div><div class="scale h" data-scale="boost"></div></div>
       <div class="tile" data-k="rpm"><div class="tile-head"><span class="label">Varvtal</span><span class="label">rpm</span></div><div class="num" data-v>--</div><div class="scale h" data-scale="rpm"></div></div>
       <div class="tile" data-k="coolant"><div class="tile-head"><span class="label">Motortemp</span></div><div class="num"><span data-v>--</span><span class="u">°C</span></div><div class="scale h" data-scale="coolant"></div></div>
@@ -315,7 +318,7 @@ body.night.cel .cel-night { display: block; }
     </section>
 
     <!-- LADDTRYCK -->
-    <section class="page p-dial" data-name="Laddtryck">
+    <section class="page p-dial" data-name="Laddtryck" data-id="1">
       <svg class="ldial p-only" data-dial="boost"></svg>
       <svg class="ldial l-only" data-dial="boostL"></svg>
       <div class="kv">
@@ -327,7 +330,7 @@ body.night.cel .cel-night { display: block; }
     </section>
 
     <!-- FART -->
-    <section class="page p-speed" data-name="Fart">
+    <section class="page p-speed" data-name="Fart" data-id="2">
       <svg class="ldial l-only" data-dial="speed"></svg>
       <svg class="ldial p-only" data-dial="speedP"></svg>
       <div class="kv p-only">
@@ -337,7 +340,7 @@ body.night.cel .cel-night { display: block; }
     </section>
 
     <!-- MOTORTEMP -->
-    <section class="page p-dial" data-name="Motortemp">
+    <section class="page p-dial" data-name="Motortemp" data-id="3">
       <svg class="ldial p-only" data-dial="temp"></svg>
       <svg class="ldial l-only" data-dial="tempL"></svg>
       <div class="kv">
@@ -347,18 +350,8 @@ body.night.cel .cel-night { display: block; }
       </div>
     </section>
 
-    <!-- BATTERI -->
-    <section class="page p-dial" data-name="Batteri">
-      <svg class="ldial p-only" data-dial="volt"></svg>
-      <svg class="ldial l-only" data-dial="voltL"></svg>
-      <div class="kv">
-        <div class="stat"><span class="label">Min</span><b id="vMin">--</b></div>
-        <div class="stat"><span class="label">Max</span><b id="vMax">--</b></div>
-      </div>
-    </section>
-
     <!-- LUFTMASSA -->
-    <section class="page p-air" data-name="Luftmassa">
+    <section class="page p-air" data-name="Luftmassa" data-id="5">
       <div class="head"><span class="label">Luftmassa mg/c</span><span class="badge" id="fAdapt">Adapterar</span></div>
       <div class="air-cols">
         <div class="air-col req"><span class="label">Begärd</span><div class="num" id="fReq">--</div><div class="air-bar"><i id="fReqBar"></i></div></div>
@@ -373,7 +366,7 @@ body.night.cel .cel-night { display: block; }
     </section>
 
     <!-- FELKODER -->
-    <section class="page p-dtc" data-name="Felkoder">
+    <section class="page p-dtc" data-name="Felkoder" data-id="6">
       <div class="head"><span class="label">Felkoder</span><span class="label" id="dCount">--</span></div>
       <div class="dtc-list" id="dList"></div>
       <div class="dtc-actions"><button id="dRead">Läs igen</button><span class="grow"></span><button id="dClear" class="danger">Radera felkoder</button></div>
@@ -383,6 +376,7 @@ body.night.cel .cel-night { display: block; }
 
   <div class="strip bottom">
     <button id="btnNight" aria-pressed="false">Night</button>
+    <span class="label vbat p-only" title="Batteri">-- V</span>
     <span class="grow"></span>
     <div class="dots" id="dots"></div>
     <span class="grow"></span>
@@ -449,7 +443,8 @@ document.getElementById('chipTxt').textContent = 'Skript steg 1';
 /* ================= Protocol v2, Wi-Fi + WebSocket (see PROTOCOL.md) ================= */
 const MSG = { DATA: 0x01, DTC: 0x02, LOG: 0x03 };
 const UPDATE_BASE = 'https://tomdooley93-max.github.io/Saab-dash/'; // published builds (GitHub Pages)
-const SLIDE = { MAIN: 0, BOOST: 1, SPEED: 2, TEMP: 3, VOLT: 4, AIRMASS: 5, DTC: 6 };
+// page ids as the dongle knows them (PROTOCOL.md); 4 was BATTERI and stays unused
+const SLIDE = { MAIN: 0, BOOST: 1, SPEED: 2, TEMP: 3, AIRMASS: 5, DTC: 6 };
 
 function parseData(dv) {
   if (dv.byteLength < 20 || dv.getUint8(0) !== 1) return null;
@@ -685,9 +680,7 @@ function buildDials() {
     zones: [[-1, 0, 'var(--vac)'], [1.6, 2, 'var(--red)']], label: v => Math.abs(v - Math.round(v)) < 1e-6 ? (v > 0 ? '+' : '') + Math.round(v) : '' }, 72, 'bar', 'LADDTRYCK');
   dials.temp = gauge('temp', { lo: 40, hi: 130, minor: 5, major: 30,
     zones: [[80, 105, 'var(--green-dim)'], [105, 115, 'var(--amber)'], [115, 130, 'var(--red)']] }, 84, '°C', 'MOTORTEMP');
-  dials.volt = gauge('volt', { lo: 8, hi: 16, minor: 0.5, major: 2,
-    zones: [[8, 11.8, 'var(--red)'], [13.2, 14.8, 'var(--green-dim)'], [15.2, 16, 'var(--amber)']] }, 76, 'V', 'BATTERI');
-  // landscape: the same three instruments in the chrome cluster style
+  // landscape: the same instruments in the chrome cluster style
   const chrome = (k, o, unit, name) => {
     const s = q(k), c = { cx: 160, cy: 160, R: 152 }; s.setAttribute('viewBox', '0 0 320 320');
     const d = ngDial(s, k, { ...c, lsize: c.R * 0.13, ...o });
@@ -700,8 +693,6 @@ function buildDials() {
     ticks: span(-1, 2, 0.1, v => [v, Math.abs(v * 2 - Math.round(v * 2)) < 1e-6, Math.abs(v - Math.round(v)) < 1e-6 ? (v > 0 ? '+' : '') + Math.round(v) : null]) }, 'bar', 'LADDTRYCK');
   dials.tempL = chrome('tempL', { ang: v => 150 + 240 * clamp01((v - 50) / 80), zones: [[105, 115, 'var(--amber)'], [115, 130, 'var(--red)']],
     ticks: span(50, 130, 5, v => [v, v % 10 === 0, v % 20 === 10 ? v : null]) }, '°C', 'MOTORTEMP');
-  dials.voltL = chrome('voltL', { ang: v => 150 + 240 * clamp01((v - 8) / 8), zones: [[8, 11.8, 'var(--red)'], [15.2, 16, 'var(--amber)']],
-    ticks: span(8, 16, 0.5, v => [v, v % 1 === 0, v % 2 === 0 ? v : null]) }, 'V', 'BATTERI');
   let s = q('speed'); s.setAttribute('viewBox', '0 0 860 350');
   dials.speed = cluster(s, 'cl', { cx: 430, cy: 175, R: 168 }, { cx: 140, cy: 222, R: 112 }, { cx: 720, cy: 222, R: 112 });
   s = q('speedP'); s.setAttribute('viewBox', '0 0 410 640');
@@ -711,7 +702,8 @@ buildDials();
 
 /* ================= State + rendering ================= */
 const state = { d: null, last: 0, dtcs: [], knownDtc: null, slide: -1, mode: 'demo' };
-const sess = { bMax: null, tMin: null, tMax: null, vMin: null, vMax: null };
+const sess = { bMax: null, tMin: null, tMax: null };
+const vbats = document.querySelectorAll('.vbat');
 const disp = { boost: 0, rpm: 0, speed: 0 };
 const fmt = (v, dp, dash = '--') => v == null ? dash : v.toFixed(dp);
 const set = (node, s) => { if (node.textContent !== s) node.textContent = s; };
@@ -723,9 +715,9 @@ function render() {
   if (d.boost != null) disp.boost += (d.boost - disp.boost) * 0.35;
   if (d.rpm != null) disp.rpm += (d.rpm - disp.rpm) * 0.35;
   if (d.speed != null) disp.speed += (d.speed - disp.speed) * 0.35;
-  if (live) { mm('bMax', d.boost, Math.max); mm('tMin', d.coolant, Math.min); mm('tMax', d.coolant, Math.max); mm('vMin', d.batt, Math.min); mm('vMax', d.batt, Math.max); }
+  if (live) { mm('bMax', d.boost, Math.max); mm('tMin', d.coolant, Math.min); mm('tMax', d.coolant, Math.max); }
   // fixed HUD (does not slide with the pages): no-data banner + check-engine lamp
-  $('noData').hidden = live || state.slide === SLIDE.DTC;
+  $('noData').hidden = live || pageId() === SLIDE.DTC;
   document.body.classList.toggle('cel', !!d.cel);
 
   const L = (v, dp) => live ? fmt(v, dp) : '--';
@@ -739,6 +731,7 @@ function render() {
   set(tiles.rpm, L(d.rpm, 0)); sc.rpm.set(live ? disp.rpm : null, live && d.rpm > 6000 ? 'var(--red)' : null);
   set(tiles.coolant, L(d.coolant, 0)); cls(tiles.coolant, live && tC(d.coolant)); sc.coolant.set(live ? d.coolant : null, col(live && tC(d.coolant)));
   set(tiles.batt, L(d.batt, 1)); cls(tiles.batt, live && vC(d.batt)); sc.batt.set(live ? d.batt : null, col(live && vC(d.batt)));
+  for (const e of vbats) { set(e, L(d.batt, 1) + ' V'); cls(e, live && vC(d.batt)); }   // every page: top strip in landscape, bottom in portrait
 
   // LADDTRYCK
   dials.boost.set(live ? disp.boost : null, col(live && bC(d.boost))); dials.boost.peak(sess.bMax);
@@ -756,19 +749,13 @@ function render() {
   set($('sBoost'), L(d.boost, 2)); cls($('sBoost'), live && bC(d.boost));
   set($('sFuel'), live && d.fuel != null ? d.fuel + ' %' : '--');
 
-  // MOTORTEMP / BATTERI
+  // MOTORTEMP
   dials.temp.set(live ? d.coolant : null, col(live && tC(d.coolant)));
   set(dials.temp.val, L(d.coolant, 0)); placeUnit(dials.temp.val); dials.temp.val.setAttribute('fill', col(live && tC(d.coolant)));
   set(dials.temp.sub, !live ? '' : d.coolant < 70 ? 'KALL MOTOR' : tC(d.coolant) === 'crit' ? 'FÖR VARM' : tC(d.coolant) ? 'VARM' : 'NORMAL');
   dials.tempL.set(live ? d.coolant : null); set(dials.tempL.val, L(d.coolant, 0)); set(dials.tempL.sub, dials.temp.sub.textContent);
   dials.tempL.val.setAttribute('fill', live && tC(d.coolant) ? col(tC(d.coolant)) : 'var(--cap)');
   set($('tMin'), fmt(sess.tMin, 0)); set($('tMax'), fmt(sess.tMax, 0)); set($('tIat'), L(d.iat, 0));
-  dials.volt.set(live ? d.batt : null, col(live && vC(d.batt)));
-  set(dials.volt.val, L(d.batt, 1)); placeUnit(dials.volt.val); dials.volt.val.setAttribute('fill', col(live && vC(d.batt)));
-  set(dials.volt.sub, !live ? '' : d.batt < 11.8 ? 'LÅG SPÄNNING' : d.batt > 15.2 ? 'HÖG SPÄNNING' : d.batt >= 13.2 ? 'LADDAR' : 'LADDAR EJ');
-  dials.voltL.set(live ? d.batt : null); set(dials.voltL.val, L(d.batt, 1)); set(dials.voltL.sub, dials.volt.sub.textContent);
-  dials.voltL.val.setAttribute('fill', live && vC(d.batt) ? col(vC(d.batt)) : 'var(--cap)');
-  set($('vMin'), fmt(sess.vMin, 1)); set($('vMax'), fmt(sess.vMax, 1));
 
   // LUFTMASSA
   set($('fReq'), L(d.airmReq, 0)); set($('fAct'), L(d.airmAct, 0));
@@ -833,13 +820,14 @@ function onDtc(dv) {
 }
 
 /* ================= Navigation ================= */
+const pageId = () => +(pages[state.slide] || pages[0]).dataset.id;
 function onSlideChange() {
   const i = Math.round(slidesEl.scrollLeft / slidesEl.clientWidth);
   if (i === state.slide) return;
   state.slide = i;
   [...$('dots').children].forEach((d, k) => d.classList.toggle('on', k === i));
   $('pageName').textContent = pages[i].dataset.name;
-  sendCmd([0x10, i]);
+  sendCmd([0x10, pageId()]);
   try { localStorage.setItem('saab.slide', i); } catch (e) {}
 }
 slidesEl.addEventListener('scroll', () => { clearTimeout(slidesEl._t); slidesEl._t = setTimeout(onSlideChange, 80); });
@@ -886,7 +874,7 @@ function open() {
   ws.onopen = () => {
     link.tries = 0; state.mode = 'live'; lastSeq = null;
     setStatus('on', 'Dongel'); btnConn.textContent = 'Koppla från';
-    log('Ansluten till dongeln'); sendCmd([0x10, state.slide]); keepAwake(); kick();
+    log('Ansluten till dongeln'); sendCmd([0x10, pageId()]); keepAwake(); kick();
   };
   ws.onmessage = e => {
     kick();
@@ -999,7 +987,7 @@ function startDemo() {
     demo.coolant = Math.min(91, demo.coolant + 0.01);
     const req = Math.max(90, Math.round(120 + 1050 * Math.max(0, load)));
     const d = {
-      canAlive: true, adapt: t > 20 && t < 28, cel: demo.dtcs.length > 0, diag: state.slide === SLIDE.AIRMASS,
+      canAlive: true, adapt: t > 20 && t < 28, cel: demo.dtcs.length > 0, diag: pageId() === SLIDE.AIRMASS,
       boost, rpm, speed: cyc < 3 ? 0 : Math.min(160, 40 + 18 * (cyc - 3) + (cyc > 8 ? 30 : 0)),
       coolant: demo.coolant, iat: 24 + 10 * Math.max(0, load), batt: 14.1 + 0.05 * Math.sin(t / 3),
       airmReq: req, airmAct: Math.round(req * (0.96 + 0.03 * Math.sin(t * 4))), afr: 9.83 + (load > 0.6 ? -1.6 : 0) + 0.08 * Math.sin(t * 5),

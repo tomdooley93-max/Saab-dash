@@ -46,7 +46,7 @@ anslutningen och ansluter igen.
 | `0x10` | u8 sid-id | Aktiv sida. Dongeln håller diagnossessionen för dynsym bara när sidan är LUFTMASSA. |
 | `0x30` | UTF-8-text | Konsolkommando: `v` (versioner), `can` (bussens status), `wifi SSID\|LÖSENORD` (spara hotspot), `reboot`. Svaret kommer som LOG. |
 
-Sid-id: 0 ÖVERSIKT, 1 LADDTRYCK, 2 FART, 3 MOTORTEMP, 4 BATTERI, 5 LUFTMASSA, 6 FELKODER.
+Sid-id: 0 ÖVERSIKT, 1 LADDTRYCK, 2 FART, 3 MOTORTEMP, 5 LUFTMASSA, 6 FELKODER. (4 var BATTERI och används inte längre; batterispänningen visas i övre listen på alla sidor.)
 
 ### DATA (20 byte)
 
