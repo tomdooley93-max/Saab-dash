@@ -14,12 +14,8 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "freertos/task.h"
+#include "board.h"
 #include "dash.h"
-
-// WiCAN-OBD pins (hw_config.h in the WiCAN firmware)
-#define CAN_TX GPIO_NUM_0
-#define CAN_RX GPIO_NUM_3
-#define CAN_STDBY GPIO_NUM_6        // high = transceiver in standby
 
 #define ID_RPM 0x110
 #define ID_OBD 0x7DF                // functional request, every ECU
@@ -453,11 +449,13 @@ static void console(const char *line)
             dash_log("Wi-Fi sparat: %s, ansluter", buf);
         else
             dash_log("Skriv: wifi SSID|LÖSENORD");
+    } else if (!strncmp(line, "obd ", 4)) {
+        chip_command(line + 4);
     } else if (!strcmp(line, "reboot")) {
         dash_log("Startar om");
         xTaskCreate(restart_task, "restart", 2048, NULL, 5, NULL);
     } else {
-        dash_log("Okänt kommando. Finns: v, can, wifi SSID|LÖSENORD, reboot");
+        dash_log("Okänt kommando. Finns: v, can, wifi SSID|LÖSENORD, obd KOMMANDO, reboot");
     }
 }
 

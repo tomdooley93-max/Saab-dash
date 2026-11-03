@@ -12,10 +12,9 @@
 #include "esp_wifi.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "board.h"
 #include "dash.h"
 
-#define VBAT_CH ADC_CHANNEL_4
-#define CAN_RX GPIO_NUM_3
 #define AWAKE_V 13.1f
 #define QUIET_MS 60000
 
@@ -26,7 +25,6 @@ static volatile float vbat = -1;
 
 float power_vbat(void) { return vbat; }
 
-// WiCAN OBD: 100k/16k divider, plus 0.2 V for its input diode
 static float read_vbat(void)
 {
     int sum = 0, n = 0;
@@ -37,7 +35,7 @@ static float read_vbat(void)
         sum += mv;
         n++;
     }
-    return n ? (float)sum / n * 116.0f / 16000.0f + 0.2f : -1;
+    return n ? (float)sum / n * VBAT_SCALE / 1000.0f + VBAT_OFFSET : -1;
 }
 
 static void sleep_until_car_wakes(void)
@@ -45,6 +43,7 @@ static void sleep_until_car_wakes(void)
     dash_log("Bilen är avstängd (%.1f V), dongeln sover", vbat);
     vTaskDelay(pdMS_TO_TICKS(300));
     car_sleep();
+    chip_sleep();
     esp_wifi_stop();
     // wake on CAN traffic too, if RX idles high with the transceiver in standby
     bool rx_wake = gpio_get_level(CAN_RX) == 1;
