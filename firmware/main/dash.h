@@ -23,6 +23,11 @@ size_t car_dtc(uint8_t *out, size_t n);
 int car_idle_ms(void);          // since the last CAN frame
 void car_sleep(void);           // CAN off, transceiver to standby
 
+// chip.c: the OBD chip, for the buses the ESP32's own CAN cannot reach (I-bus)
+void chip_start(void);
+void chip_command(const char *cmd);   // reply comes back as a LOG message
+void chip_sleep(void);
+
 // power.c: battery voltage and sleep while the car is off
 void power_start(void);
 float power_vbat(void);         // volts, < 0 unknown
