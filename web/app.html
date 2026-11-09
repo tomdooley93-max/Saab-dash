@@ -166,6 +166,7 @@ body.night.cel .cel-night { display: block; }
 .ldial text { font-family: var(--font); font-variant-numeric: tabular-nums; }
 .ldial text.sc { font-family: var(--scale-font); font-weight: 500; }
 .ldial .big { font-family: var(--num); font-weight: 500; }
+.ldial .it { transform: skewX(-8deg); transform-box: fill-box; transform-origin: center; } /* racing readout */
 @media (orientation: portrait) { .l-only { display: none !important; } }
 @media (orientation: landscape) { .p-only { display: none !important; } }
 
@@ -596,12 +597,31 @@ function arcPath(cx, cy, r, a, b) {
 }
 /* One round instrument. 240° sweep opening downwards, angles clockwise from 3 o'clock.
    mode 'arc': a lit band grows from `base` to the value (modern cluster look).
-   mode 'needle': a slim red pointer over a fine scale (classic Saab look). */
+   mode 'needle': a slim red pointer over a fine scale (classic Saab look).
+   mode 'seg': racing look, a thick band of LED-like segments that light up to the value; each
+   segment has its zone colour (segColor), dim when off, full with a soft glow when lit. */
 function makeDial(svg, o) {
   const { cx, cy, r, lo, hi, base = lo, A = 150, S = 240, mode = 'arc' } = o;
   const ang = v => A + S * clamp01((v - lo) / (hi - lo));
   const g = sv('g', {}, svg);
-  sv('path', { d: arcPath(cx, cy, r, A, A + S), stroke: 'var(--rail)', 'stroke-width': o.w || 10, fill: 'none', 'stroke-linecap': 'butt' }, g);
+  let segs = null;
+  if (mode === 'seg') {
+    const fid = 'glow' + (makeDial.n = (makeDial.n || 0) + 1);
+    const f = sv('filter', { id: fid, x: '-20%', y: '-20%', width: '140%', height: '140%' }, sv('defs', {}, svg));
+    sv('feGaussianBlur', { in: 'SourceGraphic', stdDeviation: 3.5, result: 'b' }, f);
+    const m = sv('feMerge', {}, f); sv('feMergeNode', { in: 'b' }, m); sv('feMergeNode', { in: 'SourceGraphic' }, m);
+    // thin outer and inner rings frame the band
+    const w = o.w || 10;
+    sv('path', { d: arcPath(cx, cy, r + w / 2 + 4, A, A + S), stroke: 'var(--tick)', 'stroke-width': 1.5, fill: 'none' }, g);
+    sv('path', { d: arcPath(cx, cy, r - w / 2 - 3, A, A + S), stroke: 'var(--line)', 'stroke-width': 1, fill: 'none' }, g);
+    const sg = sv('g', { filter: `url(#${fid})` }, g);
+    segs = [];
+    for (let v0 = lo; v0 < hi - 1e-9; v0 += o.seg) {
+      const v1 = Math.min(hi, v0 + o.seg), c = o.segColor((v0 + v1) / 2);
+      const p = sv('path', { d: arcPath(cx, cy, r, ang(v0) + 0.9, ang(v1) - 0.9), stroke: c, 'stroke-opacity': 0.16, 'stroke-width': w, fill: 'none' }, sg);
+      segs.push({ p, mid: (v0 + v1) / 2, v0, v1, on: false });
+    }
+  } else sv('path', { d: arcPath(cx, cy, r, A, A + S), stroke: 'var(--rail)', 'stroke-width': o.w || 10, fill: 'none', 'stroke-linecap': 'butt' }, g);
   for (const [z0, z1, c] of o.zones || []) sv('path', { d: arcPath(cx, cy, r + (o.w || 10) / 2 + 5, ang(z0), ang(z1)), stroke: c, 'stroke-width': 3, fill: 'none' }, g);
   for (let v = lo; v <= hi + 1e-9; v += o.minor) {
     const on = step => step && Math.abs((v - lo) / step - Math.round((v - lo) / step)) < 1e-6;
@@ -611,7 +631,7 @@ function makeDial(svg, o) {
     sv('line', { x1: x0, y1: y0, x2: x1, y2: y1, stroke: major ? 'var(--cap)' : mid ? 'var(--dim)' : 'var(--tick)',
       'stroke-width': major ? 2.6 : mid ? 1.8 : 1.2, class: major ? '' : 'minor' }, g);
     if (major) {
-      const [lx, ly] = P(cx, cy, mode === 'arc' ? r + (o.w || 10) / 2 + 24 : r1 - (o.lsize || 17) * 0.95, a);
+      const [lx, ly] = P(cx, cy, mode !== 'needle' ? r + (o.w || 10) / 2 + 24 : r1 - (o.lsize || 17) * 0.95, a);
       const t = sv('text', { x: lx, y: ly, 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-size': o.lsize || 17, fill: o.lcolor || 'var(--dim)', class: 'sc' }, g);
       t.textContent = o.label ? o.label(v) : +v.toFixed(2);
     }
@@ -629,6 +649,10 @@ function makeDial(svg, o) {
     g, txt,
     set(v, color) {
       const has = v != null;
+      if (segs) for (const s of segs) {
+        const on = has && (v >= base ? s.v0 >= base - 1e-9 && s.mid <= v : s.v1 <= base + 1e-9 && s.mid >= v);
+        if (on !== s.on) { s.on = on; s.p.setAttribute('stroke-opacity', on ? 1 : 0.16); }
+      }
       if (band) { band.setAttribute('d', has ? arcPath(cx, cy, r, Math.min(ang(base), ang(v)), Math.max(ang(base), ang(v))) : ''); band.setAttribute('stroke', color || 'var(--green)'); }
       if (needle) { needle.style.display = has ? '' : 'none'; if (has) needle.setAttribute('transform', `rotate(${ang(v).toFixed(2)} ${cx} ${cy})`); }
     },
@@ -730,15 +754,17 @@ function buildDials() {
   const gauge = (k, o, size, unit, name) => {
     const s = q(k); s.setAttribute('viewBox', '44 4 352 294');
     const d = makeDial(s, { cx: 220, cy: 182, r: 132, minor: 5, w: 12, ...o });
-    d.val = withUnit(d.txt(176, size, 'var(--val)', 'big'), unit);
+    d.val = withUnit(d.txt(176, size, 'var(--val)', 'big it'), unit);
     d.txt(238, 16, 'var(--dim)').textContent = name;
     d.sub = d.txt(284, 16, 'var(--dim)', 'sub');
     return d;
   };
-  dials.boost = gauge('boost', { lo: -1, hi: 2, base: 0, minor: 0.1, major: 0.5, peak: true,
-    zones: [[-1, 0, 'var(--vac)'], [1.6, 2, 'var(--red)']], label: v => Math.abs(v - Math.round(v)) < 1e-6 ? (v > 0 ? '+' : '') + Math.round(v) : '' }, 72, 'bar', 'LADDTRYCK');
-  dials.temp = gauge('temp', { lo: 40, hi: 130, minor: 5, major: 30,
-    zones: [[80, 105, 'var(--green-dim)'], [105, 115, 'var(--warn)'], [115, 130, 'var(--red)']] }, 84, '°C', 'MOTORTEMP');
+  // racing look: LED segments in their zone colour (vacuum cyan, boost green, over 1.6 bar red)
+  dials.boost = gauge('boost', { mode: 'seg', w: 22, seg: 0.1, lo: -1, hi: 2, base: 0, minor: 0.1, major: 0.5, peak: true,
+    segColor: v => v < 0 ? 'var(--vac)' : v >= 1.6 ? 'var(--red)' : 'var(--green)', label: v => Math.abs(v - Math.round(v)) < 1e-6 ? (v > 0 ? '+' : '') + Math.round(v) : '' }, 64, 'bar', 'LADDTRYCK');
+  // cold below 70 (cyan, labelled KALL MOTOR), normal green, 105 yellow, 115 red: the same limits as tC
+  dials.temp = gauge('temp', { mode: 'seg', w: 22, seg: 5, lo: 40, hi: 130, minor: 5, major: 30,
+    segColor: v => v < 70 ? 'var(--vac)' : v >= 115 ? 'var(--red)' : v >= 105 ? 'var(--warn)' : 'var(--green)' }, 84, '°C', 'MOTORTEMP');
   // landscape: the same instruments in the chrome cluster style
   const chrome = (k, o, unit, name) => {
     const s = q(k), c = { cx: 160, cy: 160, R: 152 }; s.setAttribute('viewBox', '0 0 320 320');
