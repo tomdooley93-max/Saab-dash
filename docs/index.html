@@ -19,7 +19,9 @@
 <style>
 /* Layout: full-bleed instrument pages swiped sideways. Each page is a size container; numbers scale with
    min(cqw,cqh) so the same page works upright and sideways in a phone holder. Saab night-panel palette:
-   green on black, amber/red only for state, cyan for vacuum. */
+   green light on black for the instrument, neutral numbers, yellow/red only for state (always with a
+   label or zone), cyan for vacuum. Yellow/red checked with the dataviz palette validator (ΔE 31 normal,
+   22 deutan); the earlier orange/red pair was too close (ΔE 13). */
 :root {
   --bg: #000000;
   --panel: #0a0b0a;
@@ -27,7 +29,8 @@
   --rail: #161a17;
   --green: #00ff41;
   --green-dim: #0a6b25;
-  --amber: #ff7a00;
+  --warn: #ffcc00;
+  --val: #eef0ef;      /* live values: neutral ink, colour is reserved for state */
   --red: #ff2a2a;
   --cel: #ffcc00;
   --vac: #19c3ff;
@@ -60,7 +63,7 @@ body {
    Normal colours are dimmed through the tokens; amber/red keep full strength,
    so a warning is the brightest thing on the screen at night. */
 body.night {
-  --green: #0a8a2d; --green-dim: #053a14; --cap: #6a6d6b; --dim: #3f4641; --tick: #222724;
+  --green: #0a8a2d; --green-dim: #053a14; --cap: #6a6d6b; --val: #8b908d; --dim: #3f4641; --tick: #222724;
   --rail: #0b0e0c; --line: #101311; --vac: #0d6c8c; --cel: #ffcc00;
 }
 body.night .strip { display: none; }
@@ -69,11 +72,9 @@ body.night .night-exit {
   color: var(--dim); border-color: var(--line); padding: 6px 10px; font-size: 11px;
 }
 /* per page: keep the value (and its bar/dial), drop the rest */
-body.night .tile .scale, body.night .kv, body.night .p-dial .reset, body.night .air-bar,
+body.night .tile .scale, body.night .spark, body.night .kv, body.night .p-dial .reset, body.night .air-cmp .key,
 body.night .scale .tk:not(.big), body.night .scale .lb { display: none !important; }
 body.night .dtc-actions { display: none; }
-body.night .air-col { grid-template-rows: auto minmax(0, 1fr); }
-body.night .air-col.req .num, body.night .air-col.req .label { color: #8a4400; } /* identity colour, not a warning */
 body.night .p-air .badge { visibility: hidden; }
 body.night .p-dial { grid-template-columns: minmax(0, 1fr); }
 body.night .ldial .minor, body.night .ldial .sub, body.night .ldial .tach { display: none; }
@@ -92,7 +93,7 @@ body.night .ldial .bezel { opacity: .35; }
 .chip { display: inline-flex; align-items: center; gap: 6px; }
 .chip i { width: 7px; height: 7px; border-radius: 50%; background: var(--tick); }
 .chip[data-s="on"] { color: var(--green); } .chip[data-s="on"] i { background: var(--green); box-shadow: 0 0 6px var(--green); }
-.chip[data-s="wait"] { color: var(--amber); } .chip[data-s="wait"] i { background: var(--amber); }
+.chip[data-s="wait"] { color: var(--warn); } .chip[data-s="wait"] i { background: var(--warn); }
 .chip[data-s="demo"] { color: var(--vac); } .chip[data-s="demo"] i { background: var(--vac); }
 .page-name { color: var(--green); min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .strip button { white-space: nowrap; }
@@ -117,28 +118,28 @@ button:disabled { opacity: .35; }
   flex: 0 0 100%; height: 100%; scroll-snap-align: center; container-type: size; position: relative;
   box-sizing: border-box; padding: 16px; display: grid; gap: 14px; overflow: hidden;
 }
-.num { font-family: var(--num); font-weight: 500; line-height: .86; color: var(--green); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+.num { font-family: var(--num); font-weight: 500; line-height: .86; color: var(--val); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
 .num { white-space: nowrap; }
 .num .u { font-size: max(.3em, 14px); font-weight: 500; color: var(--dim); letter-spacing: .04em; margin-left: .18em; }
 .stage { flex: 1; min-height: 0; display: flex; position: relative; }
 .stage > .slides { flex: 1; }
 .nodata {
   position: absolute; left: 16px; right: 16px; top: 12px; z-index: 2; text-align: center; pointer-events: none;
-  font-size: 13px; letter-spacing: .16em; color: var(--amber); padding: 6px; border: 1px solid #4a2600; border-radius: 4px; background: #0d0700;
+  font-size: 13px; letter-spacing: .16em; color: var(--warn); padding: 6px; border: 1px solid #4d3d00; border-radius: 4px; background: #0d0b00;
 }
 .vbat { font-variant-numeric: tabular-nums; }
-.vbat.warn { color: var(--amber); } .vbat.crit { color: var(--red); }
+.vbat.warn { color: var(--warn); } .vbat.crit { color: var(--red); }
 .cel-lamp { width: 26px; height: 18px; fill: var(--cel); display: none; flex: none; }
 body.cel .strip .cel-lamp { display: block; }
 .cel-night { position: absolute; left: 16px; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); z-index: 2; width: 30px; height: 21px; pointer-events: none; }
 body.night .page { padding-bottom: 48px; } /* keep the instrument clear of the lamp and the exit button */
 body.night.cel .cel-night { display: block; }
-.vac { color: var(--vac) !important; } .warn { color: var(--amber) !important; } .crit { color: var(--red) !important; }
+.vac { color: var(--vac) !important; } .warn { color: var(--warn) !important; } .crit { color: var(--red) !important; }
 
 /* stat row: small label / value pairs */
 .stats { display: flex; gap: 22px; flex-wrap: wrap; align-items: flex-end; }
 .stat { display: grid; gap: 4px; }
-.stat b { font: 500 clamp(22px, 7cqmin, 40px)/1 var(--num); color: var(--cap); font-variant-numeric: tabular-nums; }
+.stat b { font: 500 clamp(22px, 7cqmin, 40px)/1 var(--num); color: var(--val); font-variant-numeric: tabular-nums; }
 
 /* linear scale (horizontal default, .v = vertical) */
 .scale { position: relative; }
@@ -146,7 +147,7 @@ body.night.cel .cel-night { display: block; }
 .scale .zone { position: absolute; opacity: .9; }
 .scale .fill { position: absolute; background: var(--green); transition: none; }
 .scale .mark { position: absolute; background: var(--cap); }
-.scale .peak { position: absolute; background: var(--amber); }
+.scale .peak { position: absolute; background: #fff; }
 .scale .tk { position: absolute; background: var(--tick); }
 .scale .tk.big { background: var(--dim); }
 .scale .lb { position: absolute; font: 500 13px var(--font); color: var(--dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -180,6 +181,7 @@ body.night.cel .cel-night { display: block; }
 .ldial text { font-family: var(--font); font-variant-numeric: tabular-nums; }
 .ldial text.sc { font-family: var(--scale-font); font-weight: 500; }
 .ldial .big { font-family: var(--num); font-weight: 500; }
+.ldial .it { transform: skewX(-8deg); transform-box: fill-box; transform-origin: center; } /* racing readout */
 @media (orientation: portrait) { .l-only { display: none !important; } }
 @media (orientation: landscape) { .p-only { display: none !important; } }
 
@@ -188,12 +190,18 @@ body.night.cel .cel-night { display: block; }
 .tile { display: grid; grid-template-rows: auto 1fr auto; padding: 14px 0; gap: 6px; min-width: 0; min-height: 0; container-type: size; border-color: var(--line); border-style: solid; border-width: 0; }
 .p-main .tile + .tile { border-top-width: 1px; }
 .tile .num { font-size: min(34cqw, 40cqh); align-self: center; }
-.p-main .tile[data-k="boost"] .num { font-size: min(40cqw, 56cqh); }
-.p-main .tile:not([data-k="boost"]) { grid-template: auto 1fr / minmax(0, 1fr) auto; column-gap: 20px; }
-.p-main .tile:not([data-k="boost"]) .num { grid-area: 1 / 2 / 3 / 3; font-size: min(66cqh, 30cqw); }
-.p-main .tile:not([data-k="boost"]) .scale { align-self: end; margin-bottom: 6px; }
-.tile .scale.h { height: 14px; } .tile .scale .lb, .tile .scale .tk { display: none; }
-.tile-head { display: flex; justify-content: space-between; }
+.p-main .tile[data-k="boost"] .num { font-size: min(35cqw, 56cqh); } /* fits "-0.62 bar" (vacuum at idle) */
+.p-main .tile:not([data-k="boost"]) { grid-template: auto 1fr auto / minmax(0, 1fr) auto; column-gap: 20px; }
+.p-main .tile:not([data-k="boost"]) .num { grid-area: 1 / 2 / 3 / 3; font-size: min(52cqh, 30cqw); }
+.p-main .tile:not([data-k="boost"]) .scale { grid-column: 1 / -1; }
+.tile .scale.h { height: 16px; } .tile .scale .lb, .tile .scale .tk { display: none; }
+.tile-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+/* trend: thin line in the de-emphasis grey, latest point as a dot */
+.spark { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+.spark svg { width: 96px; height: 22px; overflow: visible; }
+.spark polyline { fill: none; stroke: var(--dim); stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
+.spark circle { fill: var(--val); }
+.spark .label { font-size: 10px; letter-spacing: .1em; }
 
 /* LADDTRYCK / MOTORTEMP: instrument + key values */
 .p-dial { grid-template-rows: auto auto auto; align-content: center; row-gap: 18px; }
@@ -203,16 +211,20 @@ body.night.cel .cel-night { display: block; }
 /* FART: tach above speedometer when upright */
 .p-speed { grid-template-rows: minmax(0, 1fr) auto; }
 
-/* LUFTMASSA: requested vs actual as two big rows with comparable bars */
-.p-air { grid-template-rows: auto minmax(0, 1fr) auto; gap: 8px; }
+/* LUFTMASSA: requested and actual as two big numbers (neutral, told apart by label and place),
+   then one shared track: fill = actual, white marker = requested, so the gap is visible */
+.p-air { grid-template-rows: auto minmax(0, 1fr) auto auto; gap: 8px; }
 .air-cols { display: grid; grid-template-rows: 1fr 1fr; min-height: 0; }
-.air-col { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 6px; min-width: 0; min-height: 0; padding: 12px 0; container-type: size; border-top: 1px solid var(--line); }
-.air-col .num { font-size: min(40cqw, 58cqh); align-self: center; }
-.air-bar { position: relative; background: var(--rail); border-radius: 2px; height: 14px; overflow: hidden; }
-.air-bar i { position: absolute; left: 0; top: 0; bottom: 0; width: var(--p, 0%); }
-.air-col.req .num, .air-col.req .label { color: var(--amber); } .air-col.req .air-bar i { background: var(--amber); }
-.air-col.act .num, .air-col.act .label { color: var(--green); } .air-col.act .air-bar i { background: var(--green); }
-.badge { font-size: 12px; letter-spacing: .14em; color: var(--amber); border: 1px solid #4a2600; padding: 3px 7px; border-radius: 3px; }
+.air-col { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 4px; min-width: 0; min-height: 0; padding: 10px 0; container-type: size; border-top: 1px solid var(--line); }
+.air-col .num { font-size: min(36cqw, 66cqh); align-self: center; }
+.air-cmp { padding-bottom: 4px; }
+.air-cmp .key { display: flex; gap: 16px; margin-top: 2px; }
+.air-cmp .key i { display: inline-block; vertical-align: middle; margin-right: 6px; }
+.air-cmp .key .ka i { width: 14px; height: 8px; background: var(--green); border-radius: 2px; }
+.air-cmp .key .kr i { width: 3px; height: 14px; background: #fff; }
+.air-cmp .scale .mark { display: none; }
+.air-cmp .scale.h .peak { width: 3px; height: 22px; top: -5px; margin-left: -1.5px; }
+.badge { font-size: 12px; letter-spacing: .14em; color: var(--warn); border: 1px solid #4d3d00; padding: 3px 7px; border-radius: 3px; }
 
 /* FELKODER */
 .p-dtc { grid-template-rows: auto 1fr auto; }
@@ -259,10 +271,10 @@ body.night.cel .cel-night { display: block; }
 
   .p-speed { display: block; padding: 10px 16px 6px; }
 
-  /* LUFTMASSA: requested | actual side by side */
+  /* LUFTMASSA: requested | actual side by side, shared track under both */
   .air-cols { grid-template: 1fr / 1fr 1fr; gap: 28px; }
   .air-col { border-top: 0; padding: 0; }
-  .air-col .num { font-size: min(26cqw, 64cqh); }
+  .air-col .num { font-size: min(30cqw, 70cqh); }
   .p-air .kv .stat { padding-top: 8px; }
   .p-air .kv .stat b { font-size: min(9cqh, 34px); }
 }
@@ -331,9 +343,9 @@ body.night.cel .cel-night { display: block; }
 
     <!-- ÖVERSIKT -->
     <section class="page p-main" data-name="Översikt" data-id="0">
-      <div class="tile" data-k="boost"><div class="tile-head"><span class="label">Laddtryck</span></div><div class="num"><span data-v>--</span><span class="u">bar</span></div><div class="scale h" data-scale="boost"></div></div>
+      <div class="tile" data-k="boost"><div class="tile-head"><span class="label">Laddtryck</span><span class="spark" data-spark="boost"><span class="label">60 s</span><svg></svg></span></div><div class="num"><span data-v>--</span><span class="u">bar</span></div><div class="scale h" data-scale="boost"></div></div>
       <div class="tile" data-k="rpm"><div class="tile-head"><span class="label">Varvtal</span><span class="label">rpm</span></div><div class="num" data-v>--</div><div class="scale h" data-scale="rpm"></div></div>
-      <div class="tile" data-k="coolant"><div class="tile-head"><span class="label">Motortemp</span></div><div class="num"><span data-v>--</span><span class="u">°C</span></div><div class="scale h" data-scale="coolant"></div></div>
+      <div class="tile" data-k="coolant"><div class="tile-head"><span class="label">Motortemp</span><span class="spark" data-spark="coolant"><span class="label">10 min</span><svg></svg></span></div><div class="num"><span data-v>--</span><span class="u">°C</span></div><div class="scale h" data-scale="coolant"></div></div>
       <div class="tile" data-k="batt"><div class="tile-head"><span class="label">Batteri</span></div><div class="num"><span data-v>--</span><span class="u">V</span></div><div class="scale h" data-scale="batt"></div></div>
     </section>
 
@@ -374,8 +386,12 @@ body.night.cel .cel-night { display: block; }
     <section class="page p-air" data-name="Luftmassa" data-id="5">
       <div class="head"><span class="label">Luftmassa mg/c</span><span class="badge" id="fAdapt">Adapterar</span></div>
       <div class="air-cols">
-        <div class="air-col req"><span class="label">Begärd</span><div class="num" id="fReq">--</div><div class="air-bar"><i id="fReqBar"></i></div></div>
-        <div class="air-col act"><span class="label">Faktisk</span><div class="num" id="fAct">--</div><div class="air-bar"><i id="fActBar"></i></div></div>
+        <div class="air-col"><span class="label">Begärd</span><div class="num" id="fReq">--</div></div>
+        <div class="air-col"><span class="label">Faktisk</span><div class="num" id="fAct">--</div></div>
+      </div>
+      <div class="air-cmp">
+        <div class="scale h" data-scale="airm"></div>
+        <div class="key"><span class="label ka"><i></i>Faktisk</span><span class="label kr"><i></i>Begärd</span></div>
       </div>
       <div class="kv">
         <div class="stat"><span class="label">Avvikelse</span><b id="fDev">--</b></div>
@@ -472,7 +488,7 @@ fitStandalone();
 addEventListener('resize', fitStandalone);
 addEventListener('orientationchange', fitStandalone);
 
-const BUILD = '20261026-2106';
+const BUILD = '20261109-0816';
 document.getElementById('chipTxt').textContent = 'Skript steg 1';
 /* ================= Protocol v2, Wi-Fi + WebSocket (see PROTOCOL.md) ================= */
 const MSG = { DATA: 0x01, DTC: 0x02, LOG: 0x03 };
@@ -550,14 +566,39 @@ function makeScale(host, { lo, hi, step, major, zones = [], peak = false, labels
 const slidesEl = $('slides'), pages = [...slidesEl.children];
 const sc = {}, tiles = {};
 const scaleDefs = {
-  boost:      { lo: -1, hi: 2, step: .5, major: 1 },
-  rpm:        { lo: 0, hi: 8000, step: 1000, major: 2000 },
-  coolant:    { lo: 40, hi: 130, step: 10, major: 30 },
-  batt:       { lo: 8, hi: 16, step: 1, major: 2 },
+  // zones = the same limits that colour the values (bC/tC/vC in render), drawn under the track
+  boost:      { lo: -1, hi: 2, step: .5, major: 1, zones: [[-1, 0, 'var(--vac)'], [1.6, 2, 'var(--red)']] },
+  rpm:        { lo: 0, hi: 8000, step: 1000, major: 2000, zones: [[6000, 8000, 'var(--red)']] },
+  coolant:    { lo: 40, hi: 130, step: 10, major: 30, zones: [[105, 115, 'var(--warn)'], [115, 130, 'var(--red)']] },
+  batt:       { lo: 8, hi: 16, step: 1, major: 2, zones: [[8, 11.8, 'var(--red)'], [15.2, 16, 'var(--warn)']] },
+  airm:       { lo: 0, hi: 1400, step: 100, major: 200, peak: true }, // peak marker = requested
 };
 document.querySelectorAll('[data-scale]').forEach(h => { sc[h.dataset.scale] = makeScale(h, scaleDefs[h.dataset.scale]); });
 document.querySelectorAll('.tile').forEach(t => { tiles[t.dataset.k] = t.querySelector('[data-v]'); });
 pages.forEach(() => $('dots').appendChild(document.createElement('i')));
+
+/* Trend line: one sample per `every` ms (the highest value in that window, so short boost peaks
+   survive), `n` samples, drawn on a fixed range so the shape means the same thing every time. */
+function makeSpark(host, { n, every, lo, hi }) {
+  const svg = host.querySelector('svg'), W = 96, H = 22;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  const line = sv('polyline', {}, svg), dot = sv('circle', { r: 2.5 }, svg);
+  const pts = []; let acc = null, t0 = 0;
+  const y = v => (H - 2 - clamp01((v - lo) / (hi - lo)) * (H - 4)).toFixed(1);
+  return {
+    add(v, now) {
+      if (v == null) { acc = null; return; }
+      acc = acc == null ? v : Math.max(acc, v);
+      if (now - t0 < every) return;
+      t0 = now; pts.push(acc); acc = null; if (pts.length > n) pts.shift();
+      const x0 = W - (pts.length - 1) * W / (n - 1);
+      line.setAttribute('points', pts.map((p, i) => `${(x0 + i * W / (n - 1)).toFixed(1)},${y(p)}`).join(' '));
+      dot.setAttribute('cx', W); dot.setAttribute('cy', y(pts[pts.length - 1]));
+      host.style.visibility = pts.length > 1 ? '' : 'hidden';
+    },
+    clear() { pts.length = 0; acc = null; host.style.visibility = 'hidden'; },
+  };
+}
 
 
 /* ================= Round instruments (SVG dials) ================= */
@@ -571,12 +612,31 @@ function arcPath(cx, cy, r, a, b) {
 }
 /* One round instrument. 240° sweep opening downwards, angles clockwise from 3 o'clock.
    mode 'arc': a lit band grows from `base` to the value (modern cluster look).
-   mode 'needle': a slim red pointer over a fine scale (classic Saab look). */
+   mode 'needle': a slim red pointer over a fine scale (classic Saab look).
+   mode 'seg': racing look, a thick band of LED-like segments that light up to the value; each
+   segment has its zone colour (segColor), dim when off, full with a soft glow when lit. */
 function makeDial(svg, o) {
   const { cx, cy, r, lo, hi, base = lo, A = 150, S = 240, mode = 'arc' } = o;
   const ang = v => A + S * clamp01((v - lo) / (hi - lo));
   const g = sv('g', {}, svg);
-  sv('path', { d: arcPath(cx, cy, r, A, A + S), stroke: 'var(--rail)', 'stroke-width': o.w || 10, fill: 'none', 'stroke-linecap': 'butt' }, g);
+  let segs = null;
+  if (mode === 'seg') {
+    const fid = 'glow' + (makeDial.n = (makeDial.n || 0) + 1);
+    const f = sv('filter', { id: fid, x: '-20%', y: '-20%', width: '140%', height: '140%' }, sv('defs', {}, svg));
+    sv('feGaussianBlur', { in: 'SourceGraphic', stdDeviation: 3.5, result: 'b' }, f);
+    const m = sv('feMerge', {}, f); sv('feMergeNode', { in: 'b' }, m); sv('feMergeNode', { in: 'SourceGraphic' }, m);
+    // thin outer and inner rings frame the band
+    const w = o.w || 10;
+    sv('path', { d: arcPath(cx, cy, r + w / 2 + 4, A, A + S), stroke: 'var(--tick)', 'stroke-width': 1.5, fill: 'none' }, g);
+    sv('path', { d: arcPath(cx, cy, r - w / 2 - 3, A, A + S), stroke: 'var(--line)', 'stroke-width': 1, fill: 'none' }, g);
+    const sg = sv('g', { filter: `url(#${fid})` }, g);
+    segs = [];
+    for (let v0 = lo; v0 < hi - 1e-9; v0 += o.seg) {
+      const v1 = Math.min(hi, v0 + o.seg), c = o.segColor((v0 + v1) / 2);
+      const p = sv('path', { d: arcPath(cx, cy, r, ang(v0) + 0.9, ang(v1) - 0.9), stroke: c, 'stroke-opacity': 0.16, 'stroke-width': w, fill: 'none' }, sg);
+      segs.push({ p, mid: (v0 + v1) / 2, v0, v1, on: false });
+    }
+  } else sv('path', { d: arcPath(cx, cy, r, A, A + S), stroke: 'var(--rail)', 'stroke-width': o.w || 10, fill: 'none', 'stroke-linecap': 'butt' }, g);
   for (const [z0, z1, c] of o.zones || []) sv('path', { d: arcPath(cx, cy, r + (o.w || 10) / 2 + 5, ang(z0), ang(z1)), stroke: c, 'stroke-width': 3, fill: 'none' }, g);
   for (let v = lo; v <= hi + 1e-9; v += o.minor) {
     const on = step => step && Math.abs((v - lo) / step - Math.round((v - lo) / step)) < 1e-6;
@@ -586,13 +646,13 @@ function makeDial(svg, o) {
     sv('line', { x1: x0, y1: y0, x2: x1, y2: y1, stroke: major ? 'var(--cap)' : mid ? 'var(--dim)' : 'var(--tick)',
       'stroke-width': major ? 2.6 : mid ? 1.8 : 1.2, class: major ? '' : 'minor' }, g);
     if (major) {
-      const [lx, ly] = P(cx, cy, mode === 'arc' ? r + (o.w || 10) / 2 + 24 : r1 - (o.lsize || 17) * 0.95, a);
+      const [lx, ly] = P(cx, cy, mode !== 'needle' ? r + (o.w || 10) / 2 + 24 : r1 - (o.lsize || 17) * 0.95, a);
       const t = sv('text', { x: lx, y: ly, 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-size': o.lsize || 17, fill: o.lcolor || 'var(--dim)', class: 'sc' }, g);
       t.textContent = o.label ? o.label(v) : +v.toFixed(2);
     }
   }
   const band = mode === 'arc' ? sv('path', { stroke: 'var(--green)', 'stroke-width': o.w || 10, fill: 'none' }, g) : null;
-  const pk = o.peak ? sv('line', { stroke: 'var(--amber)', 'stroke-width': 3 }, g) : null;
+  const pk = o.peak ? sv('line', { stroke: '#fff', 'stroke-width': 3 }, g) : null; // session max: a marker, not a warning
   let needle = null;
   if (mode === 'needle') {
     needle = sv('g', {}, g);
@@ -604,10 +664,14 @@ function makeDial(svg, o) {
     g, txt,
     set(v, color) {
       const has = v != null;
+      if (segs) for (const s of segs) {
+        const on = has && (v >= base ? s.v0 >= base - 1e-9 && s.mid <= v : s.v1 <= base + 1e-9 && s.mid >= v);
+        if (on !== s.on) { s.on = on; s.p.setAttribute('stroke-opacity', on ? 1 : 0.16); }
+      }
       if (band) { band.setAttribute('d', has ? arcPath(cx, cy, r, Math.min(ang(base), ang(v)), Math.max(ang(base), ang(v))) : ''); band.setAttribute('stroke', color || 'var(--green)'); }
       if (needle) { needle.style.display = has ? '' : 'none'; if (has) needle.setAttribute('transform', `rotate(${ang(v).toFixed(2)} ${cx} ${cy})`); }
     },
-    // session max: a short amber tick across the band
+    // session max: a short white tick across the band
     peak(v) {
       if (!pk) return;
       pk.style.display = v == null ? 'none' : '';
@@ -657,7 +721,7 @@ function ngDial(svg, id, o) {
     }
   }
   const txt = (y, size, fill, cls) => sv('text', { x: cx, y, 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-size': size, fill, class: cls || '' }, g);
-  const pk = o.peak ? sv('line', { stroke: 'var(--amber)', 'stroke-width': 4 }, g) : null;
+  const pk = o.peak ? sv('circle', { r: 4.5, fill: '#fff' }, g) : null; // session max: a dot, so it can't pass for a tick
   const extra = sv('g', {}, g); // readouts sit under the needle
   const needle = sv('g', {}, g), L = rt - 6, w = Math.max(3, R * 0.035);
   sv('path', { d: `M${cx - R * 0.16} ${cy - w}L${cx + L} ${cy - 0.8}L${cx + L} ${cy + 0.8}L${cx - R * 0.16} ${cy + w}Z`, fill: '#e9ebea' }, needle);
@@ -666,13 +730,13 @@ function ngDial(svg, id, o) {
   return {
     g, txt, extra,
     set(v) { needle.style.display = v == null ? 'none' : ''; if (v != null) needle.setAttribute('transform', `rotate(${ang(v).toFixed(2)} ${cx} ${cy})`); },
-    // session max: a short amber mark just inside the ticks
+    // session max: a white dot just inside the tick ring
     peak(v) {
       if (!pk) return;
       pk.style.display = v == null ? 'none' : '';
       if (v == null) return;
-      const [x0, y0] = P(cx, cy, rt + 2, ang(v)), [x1, y1] = P(cx, cy, rt - 16, ang(v));
-      pk.setAttribute('x1', x0); pk.setAttribute('y1', y0); pk.setAttribute('x2', x1); pk.setAttribute('y2', y1);
+      const [x0, y0] = P(cx, cy, rt - 24, ang(v));
+      pk.setAttribute('cx', x0.toFixed(1)); pk.setAttribute('cy', y0.toFixed(1));
     },
   };
 }
@@ -685,7 +749,7 @@ const span = (lo, hi, step, f) => { const out = []; for (let v = lo; v <= hi + 1
 // speedometer: 0–140 gets most of the sweep, 140–260 is compressed with smaller numbers, as in the 9-3 NG
 const kmhAng = v => { v = Math.max(0, Math.min(260, v)); return v <= 140 ? 172 + v / 140 * 128 : 300 + (v - 140) / 120 * 82; };
 function cluster(s, id, k, t, c) {
-  const kmh = ngDial(s, id, { ...k, ang: kmhAng, lsize: v => v <= 140 ? k.R * 0.105 : k.R * 0.08,
+  const kmh = ngDial(s, id, { ...k, ang: kmhAng, lsize: v => v < 100 ? k.R * 0.105 : v <= 140 ? k.R * 0.092 : k.R * 0.08, // 3-digit labels a bit smaller so 100/120 don't touch
     ticks: [...span(0, 140, 10, v => [v, v % 20 === 0, v % 20 === 0 && v > 0 ? v : null]), ...span(150, 260, 10, v => [v, v % 20 === 0, v % 20 === 0 ? v : null])] });
   readout(kmh, k, k.R, 'km/h');
   const rpm = ngDial(s, id, { ...t, ang: v => 140 + 260 * clamp01(v / 8), lsize: t.R * 0.17, zones: [[6, 8, 'var(--red)']],
@@ -705,27 +769,30 @@ function buildDials() {
   const gauge = (k, o, size, unit, name) => {
     const s = q(k); s.setAttribute('viewBox', '44 4 352 294');
     const d = makeDial(s, { cx: 220, cy: 182, r: 132, minor: 5, w: 12, ...o });
-    d.val = withUnit(d.txt(176, size, 'var(--green)', 'big'), unit);
+    d.val = withUnit(d.txt(176, size, 'var(--val)', 'big it'), unit);
     d.txt(238, 16, 'var(--dim)').textContent = name;
     d.sub = d.txt(284, 16, 'var(--dim)', 'sub');
     return d;
   };
-  dials.boost = gauge('boost', { lo: -1, hi: 2, base: 0, minor: 0.1, major: 0.5, peak: true,
-    zones: [[-1, 0, 'var(--vac)'], [1.6, 2, 'var(--red)']], label: v => Math.abs(v - Math.round(v)) < 1e-6 ? (v > 0 ? '+' : '') + Math.round(v) : '' }, 72, 'bar', 'LADDTRYCK');
-  dials.temp = gauge('temp', { lo: 40, hi: 130, minor: 5, major: 30,
-    zones: [[80, 105, 'var(--green-dim)'], [105, 115, 'var(--amber)'], [115, 130, 'var(--red)']] }, 84, '°C', 'MOTORTEMP');
+  // racing look: LED segments in their zone colour (vacuum cyan, boost green, over 1.6 bar red)
+  dials.boost = gauge('boost', { mode: 'seg', w: 22, seg: 0.1, lo: -1, hi: 2, base: 0, minor: 0.1, major: 0.5, peak: true,
+    segColor: v => v < 0 ? 'var(--vac)' : v >= 1.6 ? 'var(--red)' : 'var(--green)', label: v => Math.abs(v - Math.round(v)) < 1e-6 ? (v > 0 ? '+' : '') + Math.round(v) : '' }, 64, 'bar', 'LADDTRYCK');
+  // cold below 70 (cyan, labelled KALL MOTOR), normal green, 105 yellow, 115 red: the same limits as tC
+  dials.temp = gauge('temp', { mode: 'seg', w: 22, seg: 5, lo: 40, hi: 130, minor: 5, major: 30,
+    segColor: v => v < 70 ? 'var(--vac)' : v >= 115 ? 'var(--red)' : v >= 105 ? 'var(--warn)' : 'var(--green)' }, 84, '°C', 'MOTORTEMP');
   // landscape: the same instruments in the chrome cluster style
   const chrome = (k, o, unit, name) => {
     const s = q(k), c = { cx: 160, cy: 160, R: 152 }; s.setAttribute('viewBox', '0 0 320 320');
     const d = ngDial(s, k, { ...c, lsize: c.R * 0.13, ...o });
     readout(d, c, c.R, unit);
-    const n = d.txt(c.cy - c.R * 0.36, c.R * 0.075, '#9a9f9c'); n.textContent = name; d.extra.appendChild(n);
+    // name just above the readout: the upper half is where the needle spends its time
+    const n = d.txt(c.cy + c.R * 0.27, c.R * 0.07, '#9a9f9c'); n.textContent = name; d.extra.appendChild(n);
     d.sub = d.txt(c.cy + c.R * 0.8, c.R * 0.075, 'var(--dim)', 'sub'); d.extra.appendChild(d.sub);
     return d;
   };
   dials.boostL = chrome('boostL', { ang: v => 150 + 240 * clamp01((v + 1) / 3), peak: true, zones: [[-1, 0, 'var(--vac)'], [1.6, 2, 'var(--red)']],
     ticks: span(-1, 2, 0.1, v => [v, Math.abs(v * 2 - Math.round(v * 2)) < 1e-6, Math.abs(v - Math.round(v)) < 1e-6 ? (v > 0 ? '+' : '') + Math.round(v) : null]) }, 'bar', 'LADDTRYCK');
-  dials.tempL = chrome('tempL', { ang: v => 150 + 240 * clamp01((v - 50) / 80), zones: [[105, 115, 'var(--amber)'], [115, 130, 'var(--red)']],
+  dials.tempL = chrome('tempL', { ang: v => 150 + 240 * clamp01((v - 50) / 80), zones: [[105, 115, 'var(--warn)'], [115, 130, 'var(--red)']],
     ticks: span(50, 130, 5, v => [v, v % 10 === 0, v % 20 === 10 ? v : null]) }, '°C', 'MOTORTEMP');
   let s = q('speed'); s.setAttribute('viewBox', '0 0 860 350');
   dials.speed = cluster(s, 'cl', { cx: 430, cy: 175, R: 168 }, { cx: 140, cy: 222, R: 112 }, { cx: 720, cy: 222, R: 112 });
@@ -733,6 +800,11 @@ function buildDials() {
   dials.speedP = cluster(s, 'cp', { cx: 205, cy: 192, R: 190 }, { cx: 103, cy: 530, R: 98 }, { cx: 307, cy: 530, R: 98 });
 }
 buildDials();
+const sparks = {
+  boost: makeSpark(document.querySelector('[data-spark="boost"]'), { n: 120, every: 500, lo: -1, hi: 2 }),
+  coolant: makeSpark(document.querySelector('[data-spark="coolant"]'), { n: 120, every: 5000, lo: 40, hi: 130 }),
+};
+Object.values(sparks).forEach(x => x.clear());
 
 /* ================= State + rendering ================= */
 const state = { d: null, last: 0, dtcs: [], knownDtc: null, slide: -1, mode: 'demo' };
@@ -751,53 +823,60 @@ function render() {
   if (d.speed != null) disp.speed += (d.speed - disp.speed) * 0.35;
   if (live) { mm('bMax', d.boost, Math.max); mm('tMin', d.coolant, Math.min); mm('tMax', d.coolant, Math.max); }
   // fixed HUD (does not slide with the pages): no-data banner + check-engine lamp
-  $('noData').hidden = live || pageId() === SLIDE.DTC;
+  const nd = $('noData');
+  nd.hidden = live || pageId() === SLIDE.DTC;
+  if (!nd.hidden) set(nd, state.mode === 'off' ? (link.want ? 'SÖKER DONGEL' : 'EJ ANSLUTEN') : 'INGEN CAN-DATA');
   document.body.classList.toggle('cel', !!d.cel);
 
   const L = (v, dp) => live ? fmt(v, dp) : '--';
   const tC = c => c == null ? '' : c >= 115 ? 'crit' : c >= 105 ? 'warn' : '';
   const vC = v => v == null ? '' : v < 11.8 ? 'crit' : v > 15.2 ? 'warn' : '';
   const bC = b => b != null && b < 0 ? 'vac' : b >= 1.6 ? 'crit' : '';
-  const col = c => c === 'crit' ? 'var(--red)' : c === 'warn' ? 'var(--amber)' : c === 'vac' ? 'var(--vac)' : 'var(--green)';
+  const col = c => c === 'crit' ? 'var(--red)' : c === 'warn' ? 'var(--warn)' : c === 'vac' ? 'var(--vac)' : 'var(--green)';
+  // text only takes colour for a warning; vacuum is shown by the cyan band/zone, not the number
+  const st = c => c === 'vac' ? '' : c;
+  const colT = c => c === 'crit' || c === 'warn' ? col(c) : 'var(--val)';
+  const now = performance.now();
+  sparks.boost.add(live ? d.boost : null, now); sparks.coolant.add(live ? d.coolant : null, now);
 
   // ÖVERSIKT
-  set(tiles.boost, L(d.boost, 2)); cls(tiles.boost, live && bC(d.boost)); sc.boost.set(live ? disp.boost : null, col(live && bC(d.boost)));
-  set(tiles.rpm, L(d.rpm, 0)); sc.rpm.set(live ? disp.rpm : null, live && d.rpm > 6000 ? 'var(--red)' : null);
+  set(tiles.boost, L(d.boost, 2)); cls(tiles.boost, live && st(bC(d.boost))); sc.boost.set(live ? disp.boost : null, col(live && bC(d.boost)));
+  set(tiles.rpm, L(d.rpm, 0)); cls(tiles.rpm, live && d.rpm > 6000 ? 'crit' : ''); sc.rpm.set(live ? disp.rpm : null, live && d.rpm > 6000 ? 'var(--red)' : null);
   set(tiles.coolant, L(d.coolant, 0)); cls(tiles.coolant, live && tC(d.coolant)); sc.coolant.set(live ? d.coolant : null, col(live && tC(d.coolant)));
   set(tiles.batt, L(d.batt, 1)); cls(tiles.batt, live && vC(d.batt)); sc.batt.set(live ? d.batt : null, col(live && vC(d.batt)));
   for (const e of vbats) { set(e, L(d.batt, 1) + ' V'); cls(e, live && vC(d.batt)); }   // every page: top strip in landscape, bottom in portrait
 
   // LADDTRYCK
   dials.boost.set(live ? disp.boost : null, col(live && bC(d.boost))); dials.boost.peak(sess.bMax);
-  set(dials.boost.val, L(d.boost, 2)); placeUnit(dials.boost.val); dials.boost.val.setAttribute('fill', col(live && bC(d.boost)));
+  set(dials.boost.val, L(d.boost, 2)); placeUnit(dials.boost.val); dials.boost.val.setAttribute('fill', colT(live && bC(d.boost)));
   dials.boostL.set(live ? disp.boost : null); dials.boostL.peak(sess.bMax); set(dials.boostL.val, L(d.boost, 2));
-  dials.boostL.val.setAttribute('fill', live && bC(d.boost) ? col(bC(d.boost)) : 'var(--cap)');
+  dials.boostL.val.setAttribute('fill', colT(live && bC(d.boost)));
   set($('bMax'), fmt(sess.bMax, 2)); set($('bIat'), L(d.iat, 0)); set($('bAfr'), L(d.afr, 1));
 
   // FART
   for (const c of [dials.speed, dials.speedP]) {
     c.rpm.set(live ? disp.rpm / 1000 : null); set(c.rpm.val, L(d.rpm, 0));
     c.kmh.set(live ? disp.speed : null); set(c.kmh.val, L(d.speed, 0));
-    c.temp.set(live ? d.coolant : null); set(c.temp.val, L(d.coolant, 0)); c.temp.val.setAttribute('fill', live && tC(d.coolant) ? col(tC(d.coolant)) : 'var(--cap)'); // only warnings get colour
+    c.temp.set(live ? d.coolant : null); set(c.temp.val, L(d.coolant, 0)); c.temp.val.setAttribute('fill', colT(live && tC(d.coolant))); // only warnings get colour
   }
-  set($('sBoost'), L(d.boost, 2)); cls($('sBoost'), live && bC(d.boost));
+  set($('sBoost'), L(d.boost, 2)); cls($('sBoost'), live && st(bC(d.boost)));
   set($('sFuel'), live && d.fuel != null ? d.fuel + ' %' : '--');
 
   // MOTORTEMP
   dials.temp.set(live ? d.coolant : null, col(live && tC(d.coolant)));
-  set(dials.temp.val, L(d.coolant, 0)); placeUnit(dials.temp.val); dials.temp.val.setAttribute('fill', col(live && tC(d.coolant)));
+  set(dials.temp.val, L(d.coolant, 0)); placeUnit(dials.temp.val); dials.temp.val.setAttribute('fill', colT(live && tC(d.coolant)));
   set(dials.temp.sub, !live ? '' : d.coolant < 70 ? 'KALL MOTOR' : tC(d.coolant) === 'crit' ? 'FÖR VARM' : tC(d.coolant) ? 'VARM' : 'NORMAL');
   dials.tempL.set(live ? d.coolant : null); set(dials.tempL.val, L(d.coolant, 0)); set(dials.tempL.sub, dials.temp.sub.textContent);
-  dials.tempL.val.setAttribute('fill', live && tC(d.coolant) ? col(tC(d.coolant)) : 'var(--cap)');
+  dials.tempL.val.setAttribute('fill', colT(live && tC(d.coolant)));
   set($('tMin'), fmt(sess.tMin, 0)); set($('tMax'), fmt(sess.tMax, 0)); set($('tIat'), L(d.iat, 0));
 
   // LUFTMASSA
   set($('fReq'), L(d.airmReq, 0)); set($('fAct'), L(d.airmAct, 0));
-  $('fReqBar').style.setProperty('--p', (live && d.airmReq != null ? clamp01(d.airmReq / 1400) * 100 : 0) + '%');
-  $('fActBar').style.setProperty('--p', (live && d.airmAct != null ? clamp01(d.airmAct / 1400) * 100 : 0) + '%');
   const dev = live && d.airmReq && d.airmAct != null ? (d.airmAct - d.airmReq) / d.airmReq * 100 : null;
-  set($('fDev'), dev == null ? '--' : `${dev > 0 ? '+' : ''}${dev.toFixed(0)} %`);
-  cls($('fDev'), dev != null && Math.abs(dev) >= 15 ? 'warn' : '');
+  const devC = dev != null && Math.abs(dev) >= 15 ? 'warn' : '';
+  set($('fDev'), dev == null ? '--' : `${Math.round(dev) > 0 ? '+' : ''}${dev.toFixed(0)} %`);
+  cls($('fDev'), devC);
+  sc.airm.set(live ? d.airmAct : null, devC ? 'var(--warn)' : 'var(--green)'); sc.airm.peak(live ? d.airmReq : null);
   set($('fEth'), live && d.ethanol != null ? d.ethanol + ' %' : '--');
   set($('fFuel'), live && d.fuel != null ? d.fuel + ' %' : '--');
   set($('fAfr'), L(d.afr, 1));
@@ -806,6 +885,8 @@ function render() {
   requestAnimationFrame(render);
 }
 $('bReset').onclick = () => { sess.bMax = null; };
+// a new data source (demo <-> car) starts a new session: no demo values in the car's max/min or trends
+function newSession() { sess.bMax = sess.tMin = sess.tMax = null; Object.values(sparks).forEach(x => x.clear()); }
 
 function renderDtc() {
   const list = state.dtcs, box = $('dList');
@@ -819,21 +900,30 @@ function renderDtc() {
     box.appendChild(r);
   }
   $('dClear').disabled = !list.length;
-  if (state.knownDtc) { const fresh = list.find(x => !state.knownDtc.has(x.code)); if (fresh) showAlert(fresh.code); }
-  state.knownDtc = new Set(list.map(x => x.code));
+  // Full-screen alert only for a code not seen before. For the car the seen codes are kept between
+  // drives, so a stored code does not take over the screen at every start (the lamp still shows it).
+  // The set only grows (the dongle sends an empty list before its first read after power-up) and is
+  // emptied when codes are cleared from the app. Demo keeps its own set.
+  const live = state.mode === 'live';
+  const seen = live ? loadSeen() : (state.knownDtc || new Set());
+  const fresh = list.find(x => !seen.has(x.code)); if (fresh) showAlert(fresh.code);
+  list.forEach(x => seen.add(x.code));
+  if (live) saveSeen(seen); else state.knownDtc = seen;
 }
+function saveSeen(set) { try { localStorage.setItem('saab.dtcSeen', JSON.stringify([...set])); } catch (e) {} }
+function loadSeen() { try { return new Set(JSON.parse(localStorage.getItem('saab.dtcSeen') || '[]')); } catch (e) { return new Set(); } }
 let alertTimer = 0;
 function showAlert(code) { $('alertCode').textContent = code; $('alert').hidden = false; clearTimeout(alertTimer); alertTimer = setTimeout(hideAlert, 15000); }
 function hideAlert() { clearTimeout(alertTimer); $('alert').hidden = true; }
 $('alert').addEventListener('click', hideAlert);
 
 let clearArmed = 0;
-$('dRead').onclick = () => { sendCmd([0x02]); log('Begär felkoder'); };
+$('dRead').onclick = () => { if (state.mode === 'demo') demoPushDtc(); else sendCmd([0x02]); log('Begär felkoder'); };
 $('dClear').onclick = () => {
   const b = $('dClear');
   if (!clearArmed) { b.textContent = 'Tryck igen för att radera'; clearArmed = setTimeout(() => { clearArmed = 0; b.textContent = 'Radera felkoder'; }, 3000); return; }
   clearTimeout(clearArmed); clearArmed = 0; b.textContent = 'Radera felkoder';
-  if (state.mode === 'demo') { demo.dtcs = []; demoPushDtc(); } else sendCmd([0x01]);
+  if (state.mode === 'demo') { demo.dtcs = []; state.knownDtc = null; demoPushDtc(); } else { sendCmd([0x01]); saveSeen(new Set()); }
   log('Radera felkoder skickat');
 };
 
@@ -906,6 +996,7 @@ function open() {
   const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
   ws.binaryType = 'arraybuffer'; link.ws = ws;
   ws.onopen = () => {
+    if (state.mode !== 'live') newSession();
     link.tries = 0; state.mode = 'live'; lastSeq = null;
     setStatus('on', 'Dongel'); btnConn.textContent = 'Koppla från';
     log('Ansluten till dongeln'); sendCmd([0x10, pageId()]); keepAwake(); kick();
@@ -937,7 +1028,7 @@ function kick() { clearTimeout(link.watchdog); link.watchdog = setTimeout(() => 
 function disconnect() {
   link.want = false; clearTimeout(link.watchdog);
   const ws = link.ws; link.ws = null; if (ws) ws.close();
-  state.mode = 'off'; state.d = null;
+  state.mode = 'off'; state.d = null; releaseWake();
   setStatus('off', 'Ej ansluten'); btnConn.textContent = 'Anslut'; log('Frånkopplad');
 }
 function sendCmd(bytes) {
@@ -997,6 +1088,7 @@ $('uFile').onchange = guard(async () => {
 });
 
 let wake = null;
+function releaseWake() { if (wake) { wake.release().catch(() => {}); wake = null; } }
 async function keepAwake() { try { if (!wake && navigator.wakeLock) { wake = await navigator.wakeLock.request('screen'); wake.addEventListener('release', () => { wake = null; }); } } catch (e) {} }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && state.mode !== 'off') keepAwake(); });
 
@@ -1010,7 +1102,7 @@ function demoPushDtc() {
 }
 function startDemo() {
   if (demo.timer) return;
-  state.mode = 'demo'; setStatus('demo', 'Demo'); btnDemo.setAttribute('aria-pressed', 'true');
+  newSession(); state.knownDtc = null; state.mode = 'demo'; setStatus('demo', 'Simulerat'); btnDemo.setAttribute('aria-pressed', 'true');
   demo.t = 0; demo.alerted = false; demo.dtcs = []; demoPushDtc();
   demo.timer = setInterval(() => {
     demo.t += 0.05;
@@ -1032,7 +1124,7 @@ function startDemo() {
   }, 50);
   keepAwake(); log('Demoläge startat (simulerad data)');
 }
-function stopDemo() { clearInterval(demo.timer); demo.timer = 0; btnDemo.setAttribute('aria-pressed', 'false'); if (state.mode === 'demo') { state.mode = 'off'; state.d = null; setStatus('off', 'Ej ansluten'); } }
+function stopDemo() { clearInterval(demo.timer); demo.timer = 0; btnDemo.setAttribute('aria-pressed', 'false'); if (state.mode === 'demo') { state.mode = 'off'; state.d = null; releaseWake(); setStatus('off', 'Ej ansluten'); } }
 btnDemo.onclick = () => {
   if (demo.timer) { stopDemo(); return; }
   if (state.mode === 'live' || link.want) disconnect();
