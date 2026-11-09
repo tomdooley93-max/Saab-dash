@@ -336,7 +336,8 @@ body.night.cel .cel-night { display: block; }
 
     <!-- LADDTRYCK -->
     <section class="page p-dial" data-name="Laddtryck" data-id="1">
-      <svg class="ldial" data-dial="boost"></svg>
+      <svg class="ldial p-only" data-dial="boost"></svg>
+      <svg class="ldial l-only" data-dial="boostL"></svg>
       <div class="kv">
         <div class="stat"><span class="label">Max</span><b id="bMax">--</b></div>
         <div class="stat"><span class="label">Insug °C</span><b id="bIat">--</b></div>
@@ -357,7 +358,8 @@ body.night.cel .cel-night { display: block; }
 
     <!-- MOTORTEMP -->
     <section class="page p-dial" data-name="Motortemp" data-id="3">
-      <svg class="ldial" data-dial="temp"></svg>
+      <svg class="ldial p-only" data-dial="temp"></svg>
+      <svg class="ldial l-only" data-dial="tempL"></svg>
       <div class="kv">
         <div class="stat"><span class="label">Min</span><b id="tMin">--</b></div>
         <div class="stat"><span class="label">Max</span><b id="tMax">--</b></div>
@@ -724,6 +726,60 @@ function ngDial(svg, id, o) {
   };
 }
 // digital readout under the hub: same placement, colour and proportion on every needle dial
+/* Landscape LADDTRYCK / MOTORTEMP: aftermarket gauge with a luminous look. Black face, lit white
+   numerals, an orange needle with a soft glow, and a rim that glows from `base` up to the value
+   (red over the red zone). Session max is a yellow dot on the rim; the digital value sits low,
+   neutral unless warning. 270° sweep from 135°. */
+function glowDial(svg, id, o) {
+  const { lo, hi, base = lo, A = 135, S = 270 } = o, cx = 160, cy = 160, R = 150;
+  const ang = v => A + S * clamp01((v - lo) / (hi - lo));
+  svg.setAttribute('viewBox', '0 0 320 320');
+  // userSpaceOnUse: a bounding-box filter region collapses to nothing on a horizontal needle
+  const f = sv('filter', { id: id + 'g', filterUnits: 'userSpaceOnUse', x: -20, y: -20, width: 360, height: 360 }, sv('defs', {}, svg));
+  sv('feGaussianBlur', { stdDeviation: 3.5, result: 'b' }, f);
+  const m = sv('feMerge', {}, f); sv('feMergeNode', { in: 'b' }, m); sv('feMergeNode', { in: 'SourceGraphic' }, m);
+  const glow = `url(#${id}g)`, g = sv('g', {}, svg);
+  sv('circle', { cx, cy, r: R + 6, fill: '#0b0b0b', stroke: '#262826', 'stroke-width': 3, class: 'bezel' }, g);
+  sv('circle', { cx, cy, r: R, fill: '#030303' }, g);
+  const rr = R - 4;
+  sv('path', { d: arcPath(cx, cy, rr, A, A + S), stroke: '#1b2226', 'stroke-width': 4, fill: 'none' }, g);
+  for (const [z0, z1, c] of o.zones || []) sv('path', { d: arcPath(cx, cy, rr, ang(z0), ang(z1)), stroke: c, 'stroke-width': 4, fill: 'none', filter: glow }, g);
+  const rim = sv('path', { stroke: '#fff', 'stroke-width': 4, fill: 'none', filter: glow }, g);
+  const zc = v => { for (const [z0, z1, c] of o.zones || []) if (v >= z0 - 1e-9 && v <= z1 + 1e-9) return c; return '#fff'; };
+  for (let i = 0, v = lo; v <= hi + 1e-9; i++, v = +(lo + i * o.minor).toFixed(4)) {
+    const maj = Math.abs((v - lo) / o.major - Math.round((v - lo) / o.major)) < 1e-6, a = ang(v);
+    const [x0, y0] = P(cx, cy, R - 13, a), [x1, y1] = P(cx, cy, R - (maj ? 31 : 21), a);
+    sv('line', { x1: x0, y1: y0, x2: x1, y2: y1, stroke: zc(v), 'stroke-width': maj ? 3 : 1.3, opacity: maj ? 1 : 0.7, class: maj ? '' : 'minor' }, g);
+    const lab = o.label(v);
+    if (lab != null) {
+      const [lx, ly] = P(cx, cy, R - 52, a);
+      const t = sv('text', { x: lx, y: ly, 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-size': 27, fill: '#fff', class: 'sc', filter: glow }, g);
+      t.textContent = lab;
+    }
+  }
+  const txt = (y, size, fill, cls) => sv('text', { x: cx, y, 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-size': size, fill, class: cls || '' }, g);
+  txt(cy + 38, 11, '#9a9f9c').textContent = o.name;
+  const sub = txt(cy + 112, 11, 'var(--dim)', 'sub');
+  const val = txt(cy + 74, 40, 'var(--val)', 'big');
+  const pk = o.peak ? sv('circle', { r: 5, fill: 'var(--warn)', filter: glow }, g) : null;
+  const needle = sv('g', {}, g);
+  sv('line', { x1: cx - 20, y1: cy, x2: cx + R - 16, y2: cy, stroke: '#ff8a1e', 'stroke-width': 4, 'stroke-linecap': 'round', filter: glow }, needle);
+  sv('circle', { cx, cy, r: 14, fill: '#141414', stroke: '#333', 'stroke-width': 1.5 }, g);
+  return {
+    val, sub,
+    set(v) {
+      const has = v != null;
+      needle.style.display = has ? '' : 'none';
+      if (has) needle.setAttribute('transform', `rotate(${ang(v).toFixed(2)} ${cx} ${cy})`);
+      rim.setAttribute('d', has ? arcPath(cx, cy, rr, Math.min(ang(base), ang(v)), Math.max(ang(base), ang(v))) : '');
+    },
+    peak(v) {
+      if (!pk) return;
+      pk.style.display = v == null ? 'none' : '';
+      if (v != null) { const [x, y] = P(cx, cy, rr, ang(v)); pk.setAttribute('cx', x.toFixed(1)); pk.setAttribute('cy', y.toFixed(1)); }
+    },
+  };
+}
 function readout(d, c, R, unit) {
   d.val = d.txt(c.cy + R * 0.45, R * 0.2, 'var(--cap)', 'big'); d.extra.appendChild(d.val);
   const u = d.txt(c.cy + R * 0.62, R * 0.075, '#9a9f9c'); u.textContent = unit; d.extra.appendChild(u);
@@ -763,6 +819,10 @@ function buildDials() {
   // cold below 70 (cyan, labelled KALL MOTOR), normal green, 105 yellow, 115 red: the same limits as tC
   dials.temp = gauge('temp', { mode: 'seg', w: 22, seg: 5, lo: 40, hi: 130, minor: 5, major: 30,
     segColor: v => v < 70 ? 'var(--vac)' : v >= 115 ? 'var(--red)' : v >= 105 ? 'var(--warn)' : 'var(--green)' }, 84, '°C', 'MOTORTEMP');
+  dials.boostL = glowDial(q('boostL'), 'gb', { lo: -1, hi: 2, base: 0, minor: 0.1, major: 0.5, peak: true, name: 'LADDTRYCK · bar',
+    zones: [[1.6, 2, 'var(--red)']], label: v => Math.abs(v - Math.round(v)) < 1e-6 ? (v > 0 ? '+' : '') + Math.round(v) : null });
+  dials.tempL = glowDial(q('tempL'), 'gt', { lo: 50, hi: 130, minor: 5, major: 10, name: 'MOTORTEMP · °C',
+    zones: [[105, 115, 'var(--warn)'], [115, 130, 'var(--red)']], label: v => v % 20 === 10 ? v : null });
   let s = q('speed'); s.setAttribute('viewBox', '0 0 860 350');
   dials.speed = cluster(s, 'cl', { cx: 430, cy: 175, R: 168 }, { cx: 140, cy: 222, R: 112 }, { cx: 720, cy: 222, R: 112 });
   s = q('speedP'); s.setAttribute('viewBox', '0 0 410 640');
@@ -818,6 +878,8 @@ function render() {
   // LADDTRYCK
   dials.boost.set(live ? disp.boost : null, col(live && bC(d.boost))); dials.boost.peak(sess.bMax);
   set(dials.boost.val, L(d.boost, 2)); placeUnit(dials.boost.val); dials.boost.val.setAttribute('fill', colT(live && bC(d.boost)));
+  dials.boostL.set(live ? disp.boost : null); dials.boostL.peak(sess.bMax);
+  set(dials.boostL.val, L(d.boost, 2)); dials.boostL.val.setAttribute('fill', colT(live && bC(d.boost)));
   set($('bMax'), fmt(sess.bMax, 2)); set($('bIat'), L(d.iat, 0)); set($('bAfr'), L(d.afr, 1));
 
   // FART
@@ -833,6 +895,8 @@ function render() {
   dials.temp.set(live ? d.coolant : null, col(live && tC(d.coolant)));
   set(dials.temp.val, L(d.coolant, 0)); placeUnit(dials.temp.val); dials.temp.val.setAttribute('fill', colT(live && tC(d.coolant)));
   set(dials.temp.sub, !live ? '' : d.coolant < 70 ? 'KALL MOTOR' : tC(d.coolant) === 'crit' ? 'FÖR VARM' : tC(d.coolant) ? 'VARM' : 'NORMAL');
+  dials.tempL.set(live ? d.coolant : null); set(dials.tempL.val, L(d.coolant, 0)); set(dials.tempL.sub, dials.temp.sub.textContent);
+  dials.tempL.val.setAttribute('fill', colT(live && tC(d.coolant)));
   set($('tMin'), fmt(sess.tMin, 0)); set($('tMax'), fmt(sess.tMax, 0)); set($('tIat'), L(d.iat, 0));
 
   // LUFTMASSA
