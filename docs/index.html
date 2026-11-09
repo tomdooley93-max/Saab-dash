@@ -30,7 +30,8 @@
   --green: #00ff41;
   --green-dim: #0a6b25;
   --warn: #ffcc00;
-  --val: #eef0ef;      /* live values: neutral ink, colour is reserved for state */
+  --val: #eef0ef;
+  --glow-ink: #9dffb8; /* lit numerals/ticks of the "Lysande" gauges: green-white, like a Saab night panel */      /* live values: neutral ink, colour is reserved for state */
   --red: #ff2a2a;
   --cel: #ffcc00;
   --vac: #19c3ff;
@@ -63,7 +64,7 @@ body {
    Normal colours are dimmed through the tokens; amber/red keep full strength,
    so a warning is the brightest thing on the screen at night. */
 body.night {
-  --green: #0a8a2d; --green-dim: #053a14; --cap: #6a6d6b; --val: #8b908d; --dim: #3f4641; --tick: #222724;
+  --green: #0a8a2d; --green-dim: #053a14; --cap: #6a6d6b; --val: #8b908d; --glow-ink: #2f8a48; --dim: #3f4641; --tick: #222724;
   --rail: #0b0e0c; --line: #101311; --vac: #0d6c8c; --cel: #ffcc00;
 }
 body.night .strip { display: none; }
@@ -183,6 +184,9 @@ body.night.cel .cel-night { display: block; }
 .ldial .big { font-family: var(--num); font-weight: 500; }
 .ldial .it { transform: skewX(-8deg); transform-box: fill-box; transform-origin: center; } /* racing readout */
 @media (orientation: portrait) { .l-only { display: none !important; } }
+/* gauge style for LADDTRYCK / MOTORTEMP, chosen in the settings sheet: only the chosen one shows */
+body:not([data-gs="race"]) .gs-race, body:not([data-gs="glow"]) .gs-glow, body:not([data-gs="chrome"]) .gs-chrome { display: none !important; }
+.gs-pick { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 @media (orientation: landscape) { .p-only { display: none !important; } }
 
 /* ÖVERSIKT: boost on top, then one full-width row each (label + bar left, number right) */
@@ -351,8 +355,9 @@ body.night.cel .cel-night { display: block; }
 
     <!-- LADDTRYCK -->
     <section class="page p-dial" data-name="Laddtryck" data-id="1">
-      <svg class="ldial p-only" data-dial="boost"></svg>
-      <svg class="ldial l-only" data-dial="boostL"></svg>
+      <svg class="ldial gs-race" data-dial="boost"></svg>
+      <svg class="ldial gs-glow" data-dial="boostL"></svg>
+      <svg class="ldial gs-chrome" data-dial="boostK"></svg>
       <div class="kv">
         <div class="stat"><span class="label">Max</span><b id="bMax">--</b></div>
         <div class="stat"><span class="label">Insug °C</span><b id="bIat">--</b></div>
@@ -373,8 +378,9 @@ body.night.cel .cel-night { display: block; }
 
     <!-- MOTORTEMP -->
     <section class="page p-dial" data-name="Motortemp" data-id="3">
-      <svg class="ldial p-only" data-dial="temp"></svg>
-      <svg class="ldial l-only" data-dial="tempL"></svg>
+      <svg class="ldial gs-race" data-dial="temp"></svg>
+      <svg class="ldial gs-glow" data-dial="tempL"></svg>
+      <svg class="ldial gs-chrome" data-dial="tempK"></svg>
       <div class="kv">
         <div class="stat"><span class="label">Min</span><b id="tMin">--</b></div>
         <div class="stat"><span class="label">Max</span><b id="tMax">--</b></div>
@@ -438,6 +444,8 @@ body.night.cel .cel-night { display: block; }
   </div>
   <div class="stat"><span class="label">Rådata DATA</span><span class="hex" id="stHex">–</span></div>
   <div class="upd">
+    <div class="gs-pick"><span class="label">Mätarstil</span>
+      <button data-gs="glow">Lysande</button><button data-gs="race">Racing</button><button data-gs="chrome">Krom</button></div>
     <div class="stats">
       <div class="stat"><span class="label">App</span><b id="uApp">–</b></div>
       <div class="stat"><span class="label">Dongel</span><b id="uFw">–</b></div>
@@ -488,7 +496,7 @@ fitStandalone();
 addEventListener('resize', fitStandalone);
 addEventListener('orientationchange', fitStandalone);
 
-const BUILD = '20261109-0905';
+const BUILD = '20261109-0907';
 document.getElementById('chipTxt').textContent = 'Skript steg 1';
 /* ================= Protocol v2, Wi-Fi + WebSocket (see PROTOCOL.md) ================= */
 const MSG = { DATA: 0x01, DTC: 0x02, LOG: 0x03 };
@@ -741,9 +749,9 @@ function ngDial(svg, id, o) {
   };
 }
 // digital readout under the hub: same placement, colour and proportion on every needle dial
-/* Landscape LADDTRYCK / MOTORTEMP: aftermarket gauge with a luminous look. Black face, lit white
-   numerals, an orange needle with a soft glow, and a rim that glows from `base` up to the value
-   (red over the red zone). Session max is a yellow dot on the rim; the digital value sits low,
+/* LADDTRYCK / MOTORTEMP style "Lysande": aftermarket gauge with a luminous look in Saab green.
+   Black face, green-lit numerals and ticks, a red needle with a soft glow, and a green rim that
+   glows from `base` up to the value (yellow/red over the warning zones). Session max is a yellow dot on the rim; the digital value sits low,
    neutral unless warning. 270° sweep from 135°. */
 function glowDial(svg, id, o) {
   const { lo, hi, base = lo, A = 135, S = 270 } = o, cx = 160, cy = 160, R = 150;
@@ -757,10 +765,10 @@ function glowDial(svg, id, o) {
   sv('circle', { cx, cy, r: R + 6, fill: '#0b0b0b', stroke: '#262826', 'stroke-width': 3, class: 'bezel' }, g);
   sv('circle', { cx, cy, r: R, fill: '#030303' }, g);
   const rr = R - 4;
-  sv('path', { d: arcPath(cx, cy, rr, A, A + S), stroke: '#1b2226', 'stroke-width': 4, fill: 'none' }, g);
+  sv('path', { d: arcPath(cx, cy, rr, A, A + S), stroke: '#0e2414', 'stroke-width': 4, fill: 'none' }, g);
   for (const [z0, z1, c] of o.zones || []) sv('path', { d: arcPath(cx, cy, rr, ang(z0), ang(z1)), stroke: c, 'stroke-width': 4, fill: 'none', filter: glow }, g);
-  const rim = sv('path', { stroke: '#fff', 'stroke-width': 4, fill: 'none', filter: glow }, g);
-  const zc = v => { for (const [z0, z1, c] of o.zones || []) if (v >= z0 - 1e-9 && v <= z1 + 1e-9) return c; return '#fff'; };
+  const rim = sv('path', { stroke: 'var(--green)', 'stroke-width': 4, fill: 'none', filter: glow }, g);
+  const zc = v => { for (const [z0, z1, c] of o.zones || []) if (v >= z0 - 1e-9 && v <= z1 + 1e-9) return c; return 'var(--glow-ink)'; };
   for (let i = 0, v = lo; v <= hi + 1e-9; i++, v = +(lo + i * o.minor).toFixed(4)) {
     const maj = Math.abs((v - lo) / o.major - Math.round((v - lo) / o.major)) < 1e-6, a = ang(v);
     const [x0, y0] = P(cx, cy, R - 13, a), [x1, y1] = P(cx, cy, R - (maj ? 31 : 21), a);
@@ -768,7 +776,7 @@ function glowDial(svg, id, o) {
     const lab = o.label(v);
     if (lab != null) {
       const [lx, ly] = P(cx, cy, R - 52, a);
-      const t = sv('text', { x: lx, y: ly, 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-size': 27, fill: '#fff', class: 'sc', filter: glow }, g);
+      const t = sv('text', { x: lx, y: ly, 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-size': 27, fill: 'var(--glow-ink)', class: 'sc', filter: glow }, g);
       t.textContent = lab;
     }
   }
@@ -778,7 +786,7 @@ function glowDial(svg, id, o) {
   const val = txt(cy + 74, 40, 'var(--val)', 'big');
   const pk = o.peak ? sv('circle', { r: 5, fill: 'var(--warn)', filter: glow }, g) : null;
   const needle = sv('g', {}, g);
-  sv('line', { x1: cx - 20, y1: cy, x2: cx + R - 16, y2: cy, stroke: '#ff8a1e', 'stroke-width': 4, 'stroke-linecap': 'round', filter: glow }, needle);
+  sv('line', { x1: cx - 20, y1: cy, x2: cx + R - 16, y2: cy, stroke: 'var(--red)', 'stroke-width': 4, 'stroke-linecap': 'round', filter: glow }, needle);
   sv('circle', { cx, cy, r: 14, fill: '#141414', stroke: '#333', 'stroke-width': 1.5 }, g);
   return {
     val, sub,
@@ -834,6 +842,21 @@ function buildDials() {
   // cold below 70 (cyan, labelled KALL MOTOR), normal green, 105 yellow, 115 red: the same limits as tC
   dials.temp = gauge('temp', { mode: 'seg', w: 22, seg: 5, lo: 40, hi: 130, minor: 5, major: 30,
     segColor: v => v < 70 ? 'var(--vac)' : v >= 115 ? 'var(--red)' : v >= 105 ? 'var(--warn)' : 'var(--green)' }, 84, '°C', 'MOTORTEMP');
+  // style "Krom": the 9-3 NG cluster look
+  const chrome = (k, o, unit, name) => {
+    const s = q(k), c = { cx: 160, cy: 160, R: 152 }; s.setAttribute('viewBox', '0 0 320 320');
+    const d = ngDial(s, k, { ...c, lsize: c.R * 0.13, ...o });
+    readout(d, c, c.R, unit);
+    // name just above the readout: the upper half is where the needle spends its time
+    const n = d.txt(c.cy + c.R * 0.27, c.R * 0.07, '#9a9f9c'); n.textContent = name; d.extra.appendChild(n);
+    d.sub = d.txt(c.cy + c.R * 0.8, c.R * 0.075, 'var(--dim)', 'sub'); d.extra.appendChild(d.sub);
+    return d;
+  };
+  dials.boostK = chrome('boostK', { ang: v => 150 + 240 * clamp01((v + 1) / 3), peak: true, zones: [[-1, 0, 'var(--vac)'], [1.6, 2, 'var(--red)']],
+    ticks: span(-1, 2, 0.1, v => [v, Math.abs(v * 2 - Math.round(v * 2)) < 1e-6, Math.abs(v - Math.round(v)) < 1e-6 ? (v > 0 ? '+' : '') + Math.round(v) : null]) }, 'bar', 'LADDTRYCK');
+  dials.tempK = chrome('tempK', { ang: v => 150 + 240 * clamp01((v - 50) / 80), zones: [[105, 115, 'var(--warn)'], [115, 130, 'var(--red)']],
+    ticks: span(50, 130, 5, v => [v, v % 10 === 0, v % 20 === 10 ? v : null]) }, '°C', 'MOTORTEMP');
+  // style "Lysande"
   dials.boostL = glowDial(q('boostL'), 'gb', { lo: -1, hi: 2, base: 0, minor: 0.1, major: 0.5, peak: true, name: 'LADDTRYCK · bar',
     zones: [[1.6, 2, 'var(--red)']], label: v => Math.abs(v - Math.round(v)) < 1e-6 ? (v > 0 ? '+' : '') + Math.round(v) : null });
   dials.tempL = glowDial(q('tempL'), 'gt', { lo: 50, hi: 130, minor: 5, major: 10, name: 'MOTORTEMP · °C',
@@ -893,8 +916,10 @@ function render() {
   // LADDTRYCK
   dials.boost.set(live ? disp.boost : null, col(live && bC(d.boost))); dials.boost.peak(sess.bMax);
   set(dials.boost.val, L(d.boost, 2)); placeUnit(dials.boost.val); dials.boost.val.setAttribute('fill', colT(live && bC(d.boost)));
-  dials.boostL.set(live ? disp.boost : null); dials.boostL.peak(sess.bMax);
-  set(dials.boostL.val, L(d.boost, 2)); dials.boostL.val.setAttribute('fill', colT(live && bC(d.boost)));
+  for (const k of ['boostL', 'boostK']) {
+    dials[k].set(live ? disp.boost : null); dials[k].peak(sess.bMax);
+    set(dials[k].val, L(d.boost, 2)); dials[k].val.setAttribute('fill', colT(live && bC(d.boost)));
+  }
   set($('bMax'), fmt(sess.bMax, 2)); set($('bIat'), L(d.iat, 0)); set($('bAfr'), L(d.afr, 1));
 
   // FART
@@ -910,8 +935,10 @@ function render() {
   dials.temp.set(live ? d.coolant : null, col(live && tC(d.coolant)));
   set(dials.temp.val, L(d.coolant, 0)); placeUnit(dials.temp.val); dials.temp.val.setAttribute('fill', colT(live && tC(d.coolant)));
   set(dials.temp.sub, !live ? '' : d.coolant < 70 ? 'KALL MOTOR' : tC(d.coolant) === 'crit' ? 'FÖR VARM' : tC(d.coolant) ? 'VARM' : 'NORMAL');
-  dials.tempL.set(live ? d.coolant : null); set(dials.tempL.val, L(d.coolant, 0)); set(dials.tempL.sub, dials.temp.sub.textContent);
-  dials.tempL.val.setAttribute('fill', colT(live && tC(d.coolant)));
+  for (const k of ['tempL', 'tempK']) {
+    dials[k].set(live ? d.coolant : null); set(dials[k].val, L(d.coolant, 0)); set(dials[k].sub, dials.temp.sub.textContent);
+    dials[k].val.setAttribute('fill', colT(live && tC(d.coolant)));
+  }
   set($('tMin'), fmt(sess.tMin, 0)); set($('tMax'), fmt(sess.tMax, 0)); set($('tIat'), L(d.iat, 0));
 
   // LUFTMASSA
@@ -1185,6 +1212,17 @@ function setNight(on) {
   try { localStorage.setItem('saab.night', on ? '1' : ''); } catch (e) {}
 }
 btnNight.onclick = () => setNight(true);
+// gauge style for LADDTRYCK / MOTORTEMP (both orientations); remembered on the phone
+const GS = ['glow', 'race', 'chrome'];
+function setGaugeStyle(g) {
+  if (!GS.includes(g)) g = 'glow';
+  document.body.dataset.gs = g;
+  document.querySelectorAll('.gs-pick button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.gs === g)));
+  try { localStorage.setItem('saab.gs', g); } catch (e) {}
+}
+document.querySelectorAll('.gs-pick button').forEach(b => { b.onclick = () => setGaugeStyle(b.dataset.gs); });
+let gs0 = 'glow'; try { gs0 = localStorage.getItem('saab.gs') || 'glow'; } catch (e) {}
+setGaugeStyle(gs0);
 $('btnNightExit').onclick = () => setNight(false);
 
 const sheet = $('sheet'), logEl = $('log'), lines = [];
@@ -1222,7 +1260,7 @@ probeDongle().then(on => {
   renderUpdate();
 });
 requestAnimationFrame(() => { render(); try { goSlide(Math.min(startSlide, pages.length - 1)); } catch (e) { showScriptError(e); } });
-window.saabDash = { goSlide, setNight, showAlert, build: BUILD }; // for testing from the console
+window.saabDash = { goSlide, setNight, setGaugeStyle, showAlert, build: BUILD }; // for testing from the console
 })();
 </script>
 
