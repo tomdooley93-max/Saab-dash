@@ -351,8 +351,7 @@ body.night.cel .cel-night { display: block; }
 
     <!-- LADDTRYCK -->
     <section class="page p-dial" data-name="Laddtryck" data-id="1">
-      <svg class="ldial p-only" data-dial="boost"></svg>
-      <svg class="ldial l-only" data-dial="boostL"></svg>
+      <svg class="ldial" data-dial="boost"></svg>
       <div class="kv">
         <div class="stat"><span class="label">Max</span><b id="bMax">--</b></div>
         <div class="stat"><span class="label">Insug °C</span><b id="bIat">--</b></div>
@@ -373,8 +372,7 @@ body.night.cel .cel-night { display: block; }
 
     <!-- MOTORTEMP -->
     <section class="page p-dial" data-name="Motortemp" data-id="3">
-      <svg class="ldial p-only" data-dial="temp"></svg>
-      <svg class="ldial l-only" data-dial="tempL"></svg>
+      <svg class="ldial" data-dial="temp"></svg>
       <div class="kv">
         <div class="stat"><span class="label">Min</span><b id="tMin">--</b></div>
         <div class="stat"><span class="label">Max</span><b id="tMax">--</b></div>
@@ -488,7 +486,7 @@ fitStandalone();
 addEventListener('resize', fitStandalone);
 addEventListener('orientationchange', fitStandalone);
 
-const BUILD = '20261109-0816';
+const BUILD = '20261109-0836';
 document.getElementById('chipTxt').textContent = 'Skript steg 1';
 /* ================= Protocol v2, Wi-Fi + WebSocket (see PROTOCOL.md) ================= */
 const MSG = { DATA: 0x01, DTC: 0x02, LOG: 0x03 };
@@ -780,20 +778,6 @@ function buildDials() {
   // cold below 70 (cyan, labelled KALL MOTOR), normal green, 105 yellow, 115 red: the same limits as tC
   dials.temp = gauge('temp', { mode: 'seg', w: 22, seg: 5, lo: 40, hi: 130, minor: 5, major: 30,
     segColor: v => v < 70 ? 'var(--vac)' : v >= 115 ? 'var(--red)' : v >= 105 ? 'var(--warn)' : 'var(--green)' }, 84, '°C', 'MOTORTEMP');
-  // landscape: the same instruments in the chrome cluster style
-  const chrome = (k, o, unit, name) => {
-    const s = q(k), c = { cx: 160, cy: 160, R: 152 }; s.setAttribute('viewBox', '0 0 320 320');
-    const d = ngDial(s, k, { ...c, lsize: c.R * 0.13, ...o });
-    readout(d, c, c.R, unit);
-    // name just above the readout: the upper half is where the needle spends its time
-    const n = d.txt(c.cy + c.R * 0.27, c.R * 0.07, '#9a9f9c'); n.textContent = name; d.extra.appendChild(n);
-    d.sub = d.txt(c.cy + c.R * 0.8, c.R * 0.075, 'var(--dim)', 'sub'); d.extra.appendChild(d.sub);
-    return d;
-  };
-  dials.boostL = chrome('boostL', { ang: v => 150 + 240 * clamp01((v + 1) / 3), peak: true, zones: [[-1, 0, 'var(--vac)'], [1.6, 2, 'var(--red)']],
-    ticks: span(-1, 2, 0.1, v => [v, Math.abs(v * 2 - Math.round(v * 2)) < 1e-6, Math.abs(v - Math.round(v)) < 1e-6 ? (v > 0 ? '+' : '') + Math.round(v) : null]) }, 'bar', 'LADDTRYCK');
-  dials.tempL = chrome('tempL', { ang: v => 150 + 240 * clamp01((v - 50) / 80), zones: [[105, 115, 'var(--warn)'], [115, 130, 'var(--red)']],
-    ticks: span(50, 130, 5, v => [v, v % 10 === 0, v % 20 === 10 ? v : null]) }, '°C', 'MOTORTEMP');
   let s = q('speed'); s.setAttribute('viewBox', '0 0 860 350');
   dials.speed = cluster(s, 'cl', { cx: 430, cy: 175, R: 168 }, { cx: 140, cy: 222, R: 112 }, { cx: 720, cy: 222, R: 112 });
   s = q('speedP'); s.setAttribute('viewBox', '0 0 410 640');
@@ -849,8 +833,6 @@ function render() {
   // LADDTRYCK
   dials.boost.set(live ? disp.boost : null, col(live && bC(d.boost))); dials.boost.peak(sess.bMax);
   set(dials.boost.val, L(d.boost, 2)); placeUnit(dials.boost.val); dials.boost.val.setAttribute('fill', colT(live && bC(d.boost)));
-  dials.boostL.set(live ? disp.boost : null); dials.boostL.peak(sess.bMax); set(dials.boostL.val, L(d.boost, 2));
-  dials.boostL.val.setAttribute('fill', colT(live && bC(d.boost)));
   set($('bMax'), fmt(sess.bMax, 2)); set($('bIat'), L(d.iat, 0)); set($('bAfr'), L(d.afr, 1));
 
   // FART
@@ -866,8 +848,6 @@ function render() {
   dials.temp.set(live ? d.coolant : null, col(live && tC(d.coolant)));
   set(dials.temp.val, L(d.coolant, 0)); placeUnit(dials.temp.val); dials.temp.val.setAttribute('fill', colT(live && tC(d.coolant)));
   set(dials.temp.sub, !live ? '' : d.coolant < 70 ? 'KALL MOTOR' : tC(d.coolant) === 'crit' ? 'FÖR VARM' : tC(d.coolant) ? 'VARM' : 'NORMAL');
-  dials.tempL.set(live ? d.coolant : null); set(dials.tempL.val, L(d.coolant, 0)); set(dials.tempL.sub, dials.temp.sub.textContent);
-  dials.tempL.val.setAttribute('fill', colT(live && tC(d.coolant)));
   set($('tMin'), fmt(sess.tMin, 0)); set($('tMax'), fmt(sess.tMax, 0)); set($('tIat'), L(d.iat, 0));
 
   // LUFTMASSA
