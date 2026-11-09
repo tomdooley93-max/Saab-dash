@@ -72,7 +72,7 @@ body.night .night-exit {
   color: var(--dim); border-color: var(--line); padding: 6px 10px; font-size: 11px;
 }
 /* per page: keep the value (and its bar/dial), drop the rest */
-body.night .tile .scale, body.night .spark, body.night .kv, body.night .p-dial .reset, body.night .air-bar,
+body.night .tile .scale, body.night .spark, body.night .kv, body.night .p-dial .reset, body.night .air-cmp .key,
 body.night .scale .tk:not(.big), body.night .scale .lb { display: none !important; }
 body.night .dtc-actions { display: none; }
 body.night .p-air .badge { visibility: hidden; }
@@ -210,12 +210,19 @@ body.night.cel .cel-night { display: block; }
 /* FART: tach above speedometer when upright */
 .p-speed { grid-template-rows: minmax(0, 1fr) auto; }
 
-/* LUFTMASSA: the deviation actual vs requested is the story, so it is the hero, on a scale
-   centred on 0 (yellow zones beyond ±15 %); requested/actual are plain numbers below */
+/* LUFTMASSA: requested and actual as two big numbers (neutral, told apart by label and place),
+   then one shared track: fill = actual, white marker = requested, so the gap is visible */
 .p-air { grid-template-rows: auto minmax(0, 1fr) auto auto; gap: 8px; }
-.air-hero { display: grid; grid-template-rows: minmax(0, 1fr) auto; gap: 10px; min-height: 0; container-type: size; padding-bottom: 6px; }
-.air-hero .num { font-size: min(34cqw, 62cqh); align-self: center; }
-.air-hero .num .u { font-size: .4em; }
+.air-cols { display: grid; grid-template-rows: 1fr 1fr; min-height: 0; }
+.air-col { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 4px; min-width: 0; min-height: 0; padding: 10px 0; container-type: size; border-top: 1px solid var(--line); }
+.air-col .num { font-size: min(36cqw, 66cqh); align-self: center; }
+.air-cmp { padding-bottom: 4px; }
+.air-cmp .key { display: flex; gap: 16px; margin-top: 2px; }
+.air-cmp .key i { display: inline-block; vertical-align: middle; margin-right: 6px; }
+.air-cmp .key .ka i { width: 14px; height: 8px; background: var(--green); border-radius: 2px; }
+.air-cmp .key .kr i { width: 3px; height: 14px; background: #fff; }
+.air-cmp .scale .mark { display: none; }
+.air-cmp .scale.h .peak { width: 3px; height: 22px; top: -5px; margin-left: -1.5px; }
 .badge { font-size: 12px; letter-spacing: .14em; color: var(--warn); border: 1px solid #4d3d00; padding: 3px 7px; border-radius: 3px; }
 
 /* FELKODER */
@@ -263,16 +270,11 @@ body.night.cel .cel-night { display: block; }
 
   .p-speed { display: block; padding: 10px 16px 6px; }
 
-  /* LUFTMASSA: deviation on the left, the numbers in a ruled column on the right */
-  .p-air { grid-template: auto minmax(0, 1fr) / minmax(0, 1.5fr) minmax(0, 1fr); gap: 8px 28px; }
-  .p-air .head { grid-column: 1 / -1; }
-  .air-hero { grid-area: 2 / 1; }
-  .air-hero .num { font-size: min(26cqw, 56cqh); }
-  .p-air .kv { grid-column: 2; grid-auto-flow: row; border-top: 0; border-left: 1px solid var(--line); padding-left: 20px; align-content: center; }
-  .p-air .kv.req { grid-row: 2; align-self: start; }
-  .p-air .kv.etc { grid-row: 2; align-self: end; grid-auto-flow: column; }
-  .p-air .kv .stat { border-left: 0; padding: 8px 0; }
-  .p-air .kv.etc .stat + .stat { padding-left: 14px; border-left: 1px solid var(--line); }
+  /* LUFTMASSA: requested | actual side by side, shared track under both */
+  .air-cols { grid-template: 1fr / 1fr 1fr; gap: 28px; }
+  .air-col { border-top: 0; padding: 0; }
+  .air-col .num { font-size: min(30cqw, 70cqh); }
+  .p-air .kv .stat { padding-top: 8px; }
   .p-air .kv .stat b { font-size: min(9cqh, 34px); }
 }
 
@@ -381,16 +383,17 @@ body.night.cel .cel-night { display: block; }
 
     <!-- LUFTMASSA -->
     <section class="page p-air" data-name="Luftmassa" data-id="5">
-      <div class="head"><span class="label">Avvikelse faktisk mot begärd</span><span class="badge" id="fAdapt">Adapterar</span></div>
-      <div class="air-hero">
-        <div class="num"><span id="fDev">--</span><span class="u">%</span></div>
-        <div class="scale h" data-scale="dev"></div>
+      <div class="head"><span class="label">Luftmassa mg/c</span><span class="badge" id="fAdapt">Adapterar</span></div>
+      <div class="air-cols">
+        <div class="air-col"><span class="label">Begärd</span><div class="num" id="fReq">--</div></div>
+        <div class="air-col"><span class="label">Faktisk</span><div class="num" id="fAct">--</div></div>
       </div>
-      <div class="kv req">
-        <div class="stat"><span class="label">Begärd mg/c</span><b id="fReq">--</b></div>
-        <div class="stat"><span class="label">Faktisk mg/c</span><b id="fAct">--</b></div>
+      <div class="air-cmp">
+        <div class="scale h" data-scale="airm"></div>
+        <div class="key"><span class="label ka"><i></i>Faktisk</span><span class="label kr"><i></i>Begärd</span></div>
       </div>
-      <div class="kv etc">
+      <div class="kv">
+        <div class="stat"><span class="label">Avvikelse</span><b id="fDev">--</b></div>
         <div class="stat"><span class="label">Etanol</span><b id="fEth">--</b></div>
         <div class="stat"><span class="label">Tank</span><b id="fFuel">--</b></div>
         <div class="stat"><span class="label">AFR</span><b id="fAfr">--</b></div>
@@ -484,7 +487,7 @@ fitStandalone();
 addEventListener('resize', fitStandalone);
 addEventListener('orientationchange', fitStandalone);
 
-const BUILD = '20261109-0752';
+const BUILD = '20261109-0814';
 document.getElementById('chipTxt').textContent = 'Skript steg 1';
 /* ================= Protocol v2, Wi-Fi + WebSocket (see PROTOCOL.md) ================= */
 const MSG = { DATA: 0x01, DTC: 0x02, LOG: 0x03 };
@@ -567,7 +570,7 @@ const scaleDefs = {
   rpm:        { lo: 0, hi: 8000, step: 1000, major: 2000, zones: [[6000, 8000, 'var(--red)']] },
   coolant:    { lo: 40, hi: 130, step: 10, major: 30, zones: [[105, 115, 'var(--warn)'], [115, 130, 'var(--red)']] },
   batt:       { lo: 8, hi: 16, step: 1, major: 2, zones: [[8, 11.8, 'var(--red)'], [15.2, 16, 'var(--warn)']] },
-  dev:        { lo: -30, hi: 30, step: 5, major: 15, zones: [[-30, -15, 'var(--warn)'], [15, 30, 'var(--warn)']] },
+  airm:       { lo: 0, hi: 1400, step: 100, major: 200, peak: true }, // peak marker = requested
 };
 document.querySelectorAll('[data-scale]').forEach(h => { sc[h.dataset.scale] = makeScale(h, scaleDefs[h.dataset.scale]); });
 document.querySelectorAll('.tile').forEach(t => { tiles[t.dataset.k] = t.querySelector('[data-v]'); });
@@ -845,8 +848,9 @@ function render() {
   set($('fReq'), L(d.airmReq, 0)); set($('fAct'), L(d.airmAct, 0));
   const dev = live && d.airmReq && d.airmAct != null ? (d.airmAct - d.airmReq) / d.airmReq * 100 : null;
   const devC = dev != null && Math.abs(dev) >= 15 ? 'warn' : '';
-  set($('fDev'), dev == null ? '--' : `${Math.round(dev) > 0 ? '+' : ''}${dev.toFixed(0)}`);
-  cls($('fDev'), devC); sc.dev.set(dev, devC ? 'var(--warn)' : 'var(--green)');
+  set($('fDev'), dev == null ? '--' : `${Math.round(dev) > 0 ? '+' : ''}${dev.toFixed(0)} %`);
+  cls($('fDev'), devC);
+  sc.airm.set(live ? d.airmAct : null, devC ? 'var(--warn)' : 'var(--green)'); sc.airm.peak(live ? d.airmReq : null);
   set($('fEth'), live && d.ethanol != null ? d.ethanol + ' %' : '--');
   set($('fFuel'), live && d.fuel != null ? d.fuel + ' %' : '--');
   set($('fAfr'), L(d.afr, 1));
